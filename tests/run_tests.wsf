@@ -15,11 +15,13 @@
     <script language="VBScript" src="test_money.vbs"/>
     <script language="VBScript" src="test_rules.vbs"/>
     <script language="VBScript" src="test_scores.vbs"/>
+    <script language="VBScript" src="test_modes.vbs"/>
     <script language="VBScript"><![CDATA[
       Randomize
       RunMoneyTests
       RunRulesTests
       RunScoresTests
+      RunModesTests
       T_Finish
     ]]></script>
   </job>

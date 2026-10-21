@@ -17,12 +17,24 @@
 '   "asset"          assets dropped, new Impact
 '   "patch"          stage un-lit, -                   Patch Tuesday
 '   "ballsave_relit" -, -
-'   "saved"          -, -                              drain saved by IR retainer
+'   "saved"          -, -                              drain saved: serve a ball
 '   "bonus"          dollars, seconds                  dwell bonus at drain
 '   "evicted"        -, -                              ball ended
 '   "tilt_warning"   warning number, -
 '   "tilt"           -, -
 '   "gameover"       final score, -
+' Phase 2 - Expert Consensus multiball and Air Gap
+'   "lock_lit"       locks lit, -                      asset bank lit a lock
+'   "lock"           balls locked, -                   hold this ball, serve another
+'   "multiball"      balls to add, -                   3rd lock: release the lock + add balls
+'   "agreement"      jackpot paid, stage               two experts agreed
+'   "multiball_end"  -, -
+'   "airgap"         award, -                          captive SCADA/OT ball collected
+' Phase 3 - Storm Surge wizard
+'   "surge_start"    multiplier, -
+'   "surge_swing"    multiplier, peak                  shared weather changed
+'   "surge_tail"     tail jackpot, peak multiplier     centre ramp collected
+'   "surge_end"      collected (True/False), -
 ' =============================================================================
 
 Class TTGame
@@ -35,7 +47,6 @@ Class TTGame
     Public ExtraBallAwarded
     Public Impact            ' Double, current Impact value
     Public AssetsDropped
-    Public AirGapBreached    ' Phase 2
     Public PathMult
     Public PathsCompleted
     Public WorstPathValue
@@ -45,10 +56,32 @@ Class TTGame
     Public BallSaveUntilMs
     Public BallSaveArmed     ' relit IR retainer, used on next drain
     Public PatchTuesdayOn
+    Public BallsInPlay
+
+    ' Phase 2
+    Public LocksLit          ' Impact will lock the next ball when > 0
+    Public BallsLocked
+    Public MultiballActive
+    Public MultiballsPlayed
+    Public Jackpot           ' consensus jackpot ($)
+    Public AgreementCount    ' this game
+    Public AirGapOpen        ' gate open
+    Public AirGapBreached    ' collected at least once this game
+    Public HitBallId         ' set by the glue before each StageHit (ActiveBall.ID)
+
+    ' Phase 3
+    Public SurgeActive
+    Public SurgePlayed
+    Public SurgeMult
+    Public SurgePeak
+    Public SurgeSum          ' dollars scored during the mode
+    Public SurgeEndMs
+    Public SurgeTail         ' tail jackpot collected this game
 
     ' ---- Test hooks: force the next random pick (-1 = random) ----
     Public CardOverride
     Public PatchOverride
+    Public SurgeOverride
 
     ' ---- Private state ----
     Private m_done()
@@ -61,6 +94,10 @@ Class TTGame
     Private m_reconCount
     Private m_resaveGiven
     Private m_nextPatchMs
+    Private m_mbLastStage
+    Private m_mbLastMs
+    Private m_mbLastBall
+    Private m_nextSwingMs
 
     Private Sub Class_Initialize()
         ReDim m_done(TT_STAGE_COUNT - 1)
@@ -74,7 +111,6 @@ Class TTGame
         ExtraBallAwarded = False
         Impact = CDbl(TT_IMPACT_START)
         AssetsDropped = 0
-        AirGapBreached = False
         PathMult = TT_PATH_MULT_START
         PathsCompleted = 0
         Tilted = False
@@ -82,6 +118,8 @@ Class TTGame
         Launched = False
         BallSaveUntilMs = 0
         BallSaveArmed = False
+        BallsInPlay = 0
+        HitBallId = -1
         m_lastStageMs = 0
         m_lastLateralMs = -1
         m_lastTiltMs = -100000
@@ -90,8 +128,10 @@ Class TTGame
         m_nextPatchMs = 0
         CardOverride = -1
         PatchOverride = -1
+        SurgeOverride = -1
         BallsPerGame = TT_BallsPerGame
         PatchTuesdayOn = TT_PatchTuesdayOn
+        ResetGameModes
         ResetChain
         ClearWorst
     End Sub
@@ -108,10 +148,32 @@ Class TTGame
         ExtraBallAwarded = False
         Impact = CDbl(TT_IMPACT_START)
         AssetsDropped = 0
-        AirGapBreached = False
         PathsCompleted = 0
+        ResetGameModes
         ClearWorst
         StartBall nowMs, False
+    End Sub
+
+    Private Sub ResetGameModes()
+        LocksLit = 0
+        BallsLocked = 0
+        MultiballActive = False
+        MultiballsPlayed = 0
+        Jackpot = CDbl(TT_CONSENSUS_JACKPOT_START)
+        AgreementCount = 0
+        AirGapOpen = False
+        AirGapBreached = False
+        SurgeActive = False
+        SurgePlayed = False
+        SurgeMult = 1
+        SurgePeak = 1
+        SurgeSum = 0
+        SurgeEndMs = 0
+        SurgeTail = 0
+        m_mbLastStage = -1
+        m_mbLastMs = -100000
+        m_mbLastBall = -1
+        m_nextSwingMs = 0
     End Sub
 
     Private Sub StartBall(nowMs, isExtra)
@@ -123,6 +185,7 @@ Class TTGame
         Launched = False
         BallSaveUntilMs = 0
         BallSaveArmed = False
+        BallsInPlay = 1
         m_reconCount = 0
         m_resaveGiven = False
         m_lastStageMs = nowMs
@@ -144,11 +207,25 @@ Class TTGame
         BallSaveActive = (Launched And nowMs < BallSaveUntilMs) Or BallSaveArmed
     End Function
 
-    ' Returns 0 = saved, 1 = next ball (or extra ball), 2 = game over.
+    ' Returns 0 = saved (serve a ball), 1 = next ball (or extra ball),
+    ' 2 = game over, 3 = multiball ball lost, others still in play.
     Public Function Drain(nowMs)
         Dim secs, bonus
         Drain = 2
         If Not IsActive Then Exit Function
+
+        ' Multiball: losing a ball only ends the mode when one is left.
+        If BallsInPlay > 1 Then
+            If Not Tilted And Launched And nowMs < BallSaveUntilMs Then
+                TTEmit "saved", 0, 0
+                Drain = 0
+                Exit Function
+            End If
+            BallsInPlay = BallsInPlay - 1
+            If BallsInPlay = 1 And MultiballActive Then EndMultiball
+            Drain = 3
+            Exit Function
+        End If
 
         If Not Tilted Then
             If Launched And nowMs < BallSaveUntilMs Then
@@ -178,8 +255,11 @@ Class TTGame
         TTEmit "bonus", bonus, secs
         TTEmit "evicted", 0, 0
 
-        ' The Path in progress is lost; banked Paths stay in the score.
+        ' The Path in progress is lost; banked dollars stay.
         ResetChain
+        If MultiballActive Then EndMultiball
+        If SurgeActive Then EndSurge False
+        BallsInPlay = 0
 
         If ExtraBalls > 0 Then
             ExtraBalls = ExtraBalls - 1
@@ -196,13 +276,14 @@ Class TTGame
         End If
     End Function
 
-    ' Call every frame. Runs Patch Tuesday.
+    ' Call every frame. Runs Patch Tuesday and the Storm Surge clock.
     Public Sub Tick(nowMs)
-        If Not IsActive Or Not Launched Or Tilted Then Exit Sub
-        If Not PatchTuesdayOn Then Exit Sub
+        If Not IsActive Or Not Launched Then Exit Sub
+        If SurgeActive Then SurgeTick nowMs
+        If Tilted Or Not PatchTuesdayOn Then Exit Sub
         If nowMs < m_nextPatchMs Then Exit Sub
         m_nextPatchMs = nowMs + TT_PATCH_TUESDAY_MS
-        PatchOne
+        If Not SurgeActive Then PatchOne
     End Sub
 
     ' ======================== Shots ========================
@@ -213,6 +294,18 @@ Class TTGame
         If stage < 0 Or stage >= TT_STAGE_COUNT Then Exit Sub
 
         c = DrawCard(stage)
+        m_lastStageMs = nowMs
+        If MultiballActive Then ConsensusHit stage, nowMs
+
+        ' Storm Surge: every shot is lit, the chain is frozen.
+        If SurgeActive Then
+            value = TTRound(TT_Cards(c)(3) * Impact * SurgeMult)
+            Score = Score + value
+            SurgeSum = SurgeSum + value
+            TTEmit "card", c, value
+            Exit Sub
+        End If
+
         isLit = (stage = NextLitStage())
         value = TT_Cards(c)(3) * Impact
         If Not isLit Then value = value * TT_UNLIT_SHARE
@@ -228,7 +321,6 @@ Class TTGame
 
         value = TTRound(value)
         Score = Score + value
-        m_lastStageMs = nowMs
         TTEmit "card", c, value
 
         If isLit Then
@@ -236,12 +328,14 @@ Class TTGame
             m_value(stage) = value
             m_card(stage) = c
             If stage = ST_IMPACT Then
-                CompletePath
+                CompletePath nowMs
             Else
                 TTEmit "collected", stage, value
                 If stage = ST_RECON Then ReconCollected
             End If
         End If
+
+        If stage = ST_IMPACT Then TryLock nowMs
     End Sub
 
     ' Slingshot: "Detected: EDR"
@@ -254,12 +348,40 @@ Class TTGame
         TTEmit "edr", PathValue(), 0
     End Sub
 
-    ' Asset drop target
+    ' Asset drop target. Every full bank lights a lock.
     Public Sub AssetDropped(nowMs)
         If Not IsActive Or Tilted Then Exit Sub
         AssetsDropped = AssetsDropped + 1
         Impact = Impact + TT_IMPACT_STEP
         TTEmit "asset", AssetsDropped, Impact
+        If (AssetsDropped Mod TT_ASSETS_PER_LOCK) = 0 And Not MultiballActive Then
+            If LocksLit + BallsLocked < TT_LOCKS_FOR_MULTIBALL Then
+                LocksLit = LocksLit + 1
+                TTEmit "lock_lit", LocksLit, 0
+            End If
+        End If
+    End Sub
+
+    ' Captive SCADA / OT ball behind the Air Gap gate.
+    Public Sub AirGapHit(nowMs)
+        Dim award
+        If Not IsActive Or Tilted Or Not AirGapOpen Then Exit Sub
+        award = TTRound(Jackpot * TT_AIRGAP_MULT)
+        Score = Score + award
+        AirGapOpen = False
+        AirGapBreached = True
+        TTEmit "airgap", award, 0
+    End Sub
+
+    ' Centre ramp: collects the Storm Surge tail jackpot.
+    Public Sub CentreRampHit(nowMs)
+        Dim tail
+        If Not IsActive Or Tilted Or Not SurgeActive Then Exit Sub
+        tail = TTRound(SurgeSum * SurgePeak)
+        Score = Score + tail
+        SurgeTail = SurgeTail + tail
+        TTEmit "surge_tail", tail, SurgePeak
+        EndSurge True
     End Sub
 
     ' Tilt bob / plumb hit
@@ -270,6 +392,8 @@ Class TTGame
         TiltWarnings = TiltWarnings + 1
         If TiltWarnings > TT_TILT_WARNINGS Then
             Tilted = True
+            AirGapOpen = False
+            If SurgeActive Then EndSurge False
             TTEmit "tilt", 0, 0
         Else
             TTEmit "tilt_warning", TiltWarnings, 0
@@ -317,9 +441,19 @@ Class TTGame
         WorstPathCard = m_worstCards(i)
     End Function
 
-    ' ======================== Internals ========================
+    ' Seconds left in Storm Surge (0 if not running).
+    Public Function SurgeSecondsLeft(nowMs)
+        If Not SurgeActive Then
+            SurgeSecondsLeft = 0
+        Else
+            SurgeSecondsLeft = Int((SurgeEndMs - nowMs + 999) / 1000)
+            If SurgeSecondsLeft < 0 Then SurgeSecondsLeft = 0
+        End If
+    End Function
 
-    Private Sub CompletePath()
+    ' ======================== Internals: Paths ========================
+
+    Private Sub CompletePath(nowMs)
         Dim award, i, multUsed
         multUsed = PathMult
         award = TTRound(PathValue() * multUsed)
@@ -345,6 +479,8 @@ Class TTGame
         End If
 
         ResetChain
+
+        If PathsCompleted >= TT_WIZARD_AT_PATHS And Not SurgePlayed Then StartSurge nowMs
     End Sub
 
     Private Sub ReconCollected()
@@ -389,6 +525,109 @@ Class TTGame
         m_card(picked) = -1
         TTEmit "patch", picked, 0
     End Sub
+
+    ' ======================== Internals: Expert Consensus ========================
+
+    Private Sub TryLock(nowMs)
+        If LocksLit <= 0 Or MultiballActive Then Exit Sub
+        LocksLit = LocksLit - 1
+        BallsLocked = BallsLocked + 1
+        If BallsLocked >= TT_LOCKS_FOR_MULTIBALL Then
+            StartMultiball nowMs
+        Else
+            TTEmit "lock", BallsLocked, 0
+        End If
+    End Sub
+
+    Private Sub StartMultiball(nowMs)
+        Dim adding
+        adding = TT_LOCKS_FOR_MULTIBALL - 1
+        MultiballActive = True
+        MultiballsPlayed = MultiballsPlayed + 1
+        BallsLocked = 0
+        LocksLit = 0
+        BallsInPlay = BallsInPlay + adding
+        Jackpot = CDbl(TT_CONSENSUS_JACKPOT_START)
+        AirGapOpen = True
+        BallSaveUntilMs = nowMs + TT_MB_BALLSAVE_MS
+        m_mbLastStage = -1
+        m_mbLastMs = -100000
+        m_mbLastBall = -1
+        TTEmit "multiball", adding, 0
+    End Sub
+
+    Private Sub EndMultiball()
+        MultiballActive = False
+        AirGapOpen = False
+        TTEmit "multiball_end", 0, 0
+    End Sub
+
+    ' Same stage as the previous multiball hit, inside the window, by a
+    ' different ball = agreement. A hit on a different stage = scattered.
+    Private Sub ConsensusHit(stage, nowMs)
+        If stage = m_mbLastStage And nowMs - m_mbLastMs <= TT_CONSENSUS_WINDOW_MS _
+           And HitBallId <> m_mbLastBall And HitBallId >= 0 Then
+            Score = Score + Jackpot
+            AgreementCount = AgreementCount + 1
+            TTEmit "agreement", Jackpot, stage
+            Jackpot = Jackpot + TT_CONSENSUS_JACKPOT_STEP
+            m_mbLastStage = -1
+            m_mbLastMs = -100000
+            m_mbLastBall = -1
+            Exit Sub
+        End If
+        If m_mbLastStage >= 0 And stage <> m_mbLastStage Then
+            Jackpot = TTRound(Jackpot * (1 - TT_CONSENSUS_DECAY))
+            If Jackpot < TT_CONSENSUS_JACKPOT_MIN Then Jackpot = CDbl(TT_CONSENSUS_JACKPOT_MIN)
+        End If
+        m_mbLastStage = stage
+        m_mbLastMs = nowMs
+        m_mbLastBall = HitBallId
+    End Sub
+
+    ' ======================== Internals: Storm Surge ========================
+
+    Private Sub StartSurge(nowMs)
+        SurgeActive = True
+        SurgePlayed = True
+        SurgeSum = 0
+        SurgeEndMs = nowMs + TT_SURGE_MS
+        SurgeMult = NextSurgeMult()
+        SurgePeak = SurgeMult
+        m_nextSwingMs = nowMs + TT_SURGE_SWING_MS
+        TTEmit "surge_start", SurgeMult, 0
+    End Sub
+
+    Private Sub SurgeTick(nowMs)
+        If nowMs >= SurgeEndMs Then
+            EndSurge False
+            Exit Sub
+        End If
+        If nowMs >= m_nextSwingMs Then
+            m_nextSwingMs = m_nextSwingMs + TT_SURGE_SWING_MS
+            SurgeMult = NextSurgeMult()
+            If SurgeMult > SurgePeak Then SurgePeak = SurgeMult
+            TTEmit "surge_swing", SurgeMult, SurgePeak
+        End If
+    End Sub
+
+    Private Sub EndSurge(collected)
+        If Not SurgeActive Then Exit Sub
+        SurgeActive = False
+        SurgeMult = 1
+        TTEmit "surge_end", collected, 0
+    End Sub
+
+    Private Function NextSurgeMult()
+        If SurgeOverride >= 0 Then
+            NextSurgeMult = SurgeOverride
+            SurgeOverride = -1
+        Else
+            NextSurgeMult = TT_SURGE_MULT_MIN + Int(Rnd * (TT_SURGE_MULT_MAX - TT_SURGE_MULT_MIN + 1))
+        End If
+    End Function
+
+    ' ======================== Internals: misc ========================
 
     Private Function DrawCard(stage)
         Dim i, n, pick

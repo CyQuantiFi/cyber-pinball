@@ -74,15 +74,21 @@ Const TT_INITIALS_TIMEOUT_MS = 45000  ' Auto-accept initials after this
 Const TT_CLAIM_MS = 20000             ' "Scan to claim" screen after initials
 Const TT_ATTRACT_PAGE_MS = 5000       ' Attract page rotation
 
-' ---- Phase 2 / 3 (present, not yet used) -------------------------------------
-Const TT_LOCKS_FOR_MULTIBALL = 3
-Const TT_CONSENSUS_WINDOW_MS = 4000
-Const TT_CONSENSUS_JACKPOT_STEP = 250000
-Const TT_CONSENSUS_DECAY = 0.05
-Const TT_AIRGAP_MULT = 3
-Const TT_WIZARD_AT_PATHS = 3
+' ---- Phase 2: Expert Consensus multiball and Air Gap -------------------------
+Const TT_ASSETS_PER_LOCK = 3            ' Asset drops per lit lock (one full bank)
+Const TT_LOCKS_FOR_MULTIBALL = 3        ' Balls locked at Impact to start multiball
+Const TT_MB_BALLSAVE_MS = 10000         ' IR retainer at multiball start
+Const TT_CONSENSUS_WINDOW_MS = 4000     ' Same stage, different ball, inside this = agreement
+Const TT_CONSENSUS_JACKPOT_START = 500000 ' Jackpot at multiball start
+Const TT_CONSENSUS_JACKPOT_STEP = 250000  ' Added after each agreement
+Const TT_CONSENSUS_DECAY = 0.05         ' Scattered hit (different stage) cuts the jackpot
+Const TT_CONSENSUS_JACKPOT_MIN = 100000 ' Decay floor
+Const TT_AIRGAP_MULT = 3                ' Air Gap pays current jackpot x this
+
+' ---- Phase 3: Storm Surge wizard -----------------------------------------------
+Const TT_WIZARD_AT_PATHS = 3            ' Completed Paths in one game to start it
 Const TT_SURGE_MS = 45000
-Const TT_SURGE_SWING_MS = 5000
+Const TT_SURGE_SWING_MS = 5000          ' Shared multiplier changes this often
 Const TT_SURGE_MULT_MIN = 1
 Const TT_SURGE_MULT_MAX = 10
 

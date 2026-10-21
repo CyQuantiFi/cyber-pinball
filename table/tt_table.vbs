@@ -14,14 +14,18 @@ Dim TTLastInitials
 Dim TTAssetDown(2)
 Dim TTNudgeTimes(2), TTNudgeHead
 Dim TTStageLightNames, TTStageLights(6), TTStageLightState(6)
+Dim TTLockHold              ' set when the rules lock the ball sitting in kImpact
+Dim TTTaskSeq               ' makes repeatable task names unique
+Dim TTGateOpen              ' last Air Gap gate state applied
 
-' Phase 1 objects. Startup check reports any that are missing.
+' Startup check reports any of these that are missing.
 Function TTRequiredObjects()
     TTRequiredObjects = Array( _
         "LeftFlipper", "RightFlipper", "Plunger", "BallRelease", "Drain", "swPlungerLane", _
         "swRecon", "swInitialAccess", "swExecution", "kPersistence", "swPrivEsc", "swLateral", "kImpact", _
         "liRecon", "liInitialAccess", "liExecution", "liPersistence", "liPrivEsc", "liLateral", "liImpact", _
-        "dtAsset1", "dtAsset2", "dtAsset3", "LeftSlingshot", "RightSlingshot", "tmrTick")
+        "dtAsset1", "dtAsset2", "dtAsset3", "LeftSlingshot", "RightSlingshot", "tmrTick", _
+        "liLock1", "liLock2", "liLock3", "AirGapGate", "liAirGap", "swAirGap", "swCentreRamp")
 End Function
 
 ' ---------------------------------------------------------------- table events
@@ -43,6 +47,10 @@ Sub Table1_Init()
         TTNudgeTimes(i) = -100000
     Next
     TTNudgeHead = 0
+    TTTaskSeq = 0
+    TTLockHold = False
+    TTGateOpen = True
+    TTSetAirGapGate False
 
     TTScoresLoad
     TTDisplayInit
@@ -167,13 +175,42 @@ Sub kPersistence_Hit()
     TTSchedule "kickPersistence", TT_SAUCER_HOLD_MS
 End Sub
 
+' Impact scoop doubles as the lock. A locked ball is removed and a new one
+' served to the plunger (virtual lock); the 3rd lock starts multiball.
 Sub kImpact_Hit()
+    TTLockHold = False
     TTStage ST_IMPACT
-    TTSchedule "kickImpact", TT_SAUCER_HOLD_MS
+    If TTLockHold Then
+        kImpact.DestroyBall
+        TTScheduleSeq "release", 1200
+    Else
+        TTSchedule "kickImpact", TT_SAUCER_HOLD_MS
+    End If
 End Sub
 
 Sub TTStage(stage)
-    If TTMode = "game" Then TTG.StageHit stage, GameTime
+    If TTMode <> "game" Then Exit Sub
+    TTG.HitBallId = TTActiveBallId()
+    TTG.StageHit stage, GameTime
+End Sub
+
+' Which ball made the shot (Expert Consensus needs different balls).
+Function TTActiveBallId()
+    TTActiveBallId = -1
+    On Error Resume Next
+    TTActiveBallId = ActiveBall.ID
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' Phase 2: captive SCADA / OT ball behind the Air Gap gate
+Sub swAirGap_Hit()
+    If TTMode = "game" Then TTG.AirGapHit GameTime
+End Sub
+
+' Phase 3: centre ramp collects the Storm Surge tail jackpot
+Sub swCentreRamp_Hit()
+    If TTMode = "game" Then TTG.CentreRampHit GameTime
 End Sub
 
 Sub dtAsset1_Hit() : TTAssetHit 0 : End Sub
@@ -215,6 +252,13 @@ Sub Drain_Hit()
     If TTMode = "game" Then TTG.Drain GameTime
 End Sub
 
+' Multiball: extra experts come out of the Impact scoop.
+Sub TTAddMultiballBall()
+    kImpact.CreateBall
+    kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE
+    TTPlay "kicker"
+End Sub
+
 Sub TTReleaseBall()
     BallRelease.CreateBall
     BallRelease.Kick TT_RELEASE_ANGLE, TT_RELEASE_FORCE
@@ -232,7 +276,7 @@ Sub TTEmit(kind, a, b)
             Else
                 TTDisplayMessage "BALL " & a, "HIT THE LIT SHOT", TT_MSG_SHOW_MS, t
             End If
-            TTSchedule "release", 1500
+            TTScheduleSeq "release", 1500
         Case "card"
             TTDisplayCard UCase(TTCardName(a)), TTCardId(a) & "   +" & TTMoney(b), t
             TTPlay "card"
@@ -261,7 +305,7 @@ Sub TTEmit(kind, a, b)
         Case "saved"
             TTDisplayMessage "IR RETAINER", "BALL SAVED", TT_MSG_SHOW_MS, t
             TTPlay "saved"
-            TTSchedule "release", 1000
+            TTScheduleSeq "release", 1000
         Case "bonus"
             TTDisplayMessage "DWELL TIME", b & " SEC UNDETECTED  +" & TTMoney(a), TT_MSG_SHOW_MS, t
         Case "evicted"
@@ -274,6 +318,38 @@ Sub TTEmit(kind, a, b)
             TTPlay "tilt"
             LeftFlipper.RotateToStart
             RightFlipper.RotateToStart
+        Case "lock_lit"
+            TTDisplayMessage "LOCK IS LIT", "SHOOT IMPACT TO LOCK AN EXPERT", TT_MSG_SHOW_MS, t
+            TTPlay "lock_lit"
+        Case "lock"
+            TTLockHold = True
+            TTDisplayMessage "EXPERT " & a & " LOCKED", (TT_LOCKS_FOR_MULTIBALL - a) & " MORE FOR CONSENSUS", TT_MSG_SHOW_MS, t
+            TTPlay "lock"
+        Case "multiball"
+            TTDisplayMessage "EXPERT CONSENSUS", "SAME SHOT, DIFFERENT BALLS = JACKPOT", 2500, t
+            TTPlay "multiball"
+            TTScheduleSeq "mbAdd", 1500
+            If a > 1 Then TTScheduleSeq "mbAdd", 3000
+        Case "agreement"
+            TTDisplayMessage "AGREEMENT", "JACKPOT " & TTMoney(a), TT_MSG_SHOW_MS, t
+            TTPlay "jackpot"
+        Case "multiball_end"
+            TTDisplayMessage "CONSENSUS CLOSED", "AIR GAP SEALED", TT_MSG_SHOW_MS, t
+        Case "airgap"
+            TTDisplayMessage "AIR GAP BREACHED " & TTMoney(a), "QUANTIFIED THE ASSET YOU CAN'T SCAN", 3500, t
+            TTPlay "air_gap"
+        Case "surge_start"
+            TTDisplayMessage "STORM SURGE", "45 SEC - CENTRE RAMP FOR TAIL JACKPOT", 2500, t
+            TTPlay "storm_surge"
+            TTMusic "surge.mp3"
+        Case "surge_swing"
+            TTDisplayMessage "SHARED WEATHER X" & a, "PEAK X" & b, 1000, t
+        Case "surge_tail"
+            TTDisplayMessage "TAIL JACKPOT " & TTMoney(a), "SUM OF THE STORM X" & b & " PEAK", 3500, t
+            TTPlay "jackpot"
+        Case "surge_end"
+            If Not a Then TTDisplayMessage "STORM PASSED", "TAIL JACKPOT MISSED", TT_MSG_SHOW_MS, t
+            TTMusic "theme.mp3"
         Case "gameover"
             TTMode = "gameover_wait"
             TTPlay "gameover"
@@ -384,6 +460,12 @@ Sub TTSchedule(name, delayMs)
     TTTasks(name) = GameTime + delayMs
 End Sub
 
+' For tasks that can overlap (ball serves), e.g. "release#12"
+Sub TTScheduleSeq(name, delayMs)
+    TTTaskSeq = TTTaskSeq + 1
+    TTTasks(name & "#" & TTTaskSeq) = GameTime + delayMs
+End Sub
+
 Sub TTRunTasks(t)
     Dim k
     For Each k In TTTasks.Keys
@@ -396,9 +478,14 @@ Sub TTRunTasks(t)
     Next
 End Sub
 
-Sub TTRunTask(name)
+Sub TTRunTask(fullName)
+    Dim name, p
+    name = fullName
+    p = InStr(fullName, "#")
+    If p > 0 Then name = Left(fullName, p - 1)
     Select Case name
         Case "release":          TTReleaseBall
+        Case "mbAdd":            TTAddMultiballBall
         Case "kickPersistence":  kPersistence.Kick TT_KICK_PERSISTENCE_ANGLE, TT_KICK_PERSISTENCE_FORCE : TTPlay "kicker"
         Case "kickImpact":       kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE : TTPlay "kicker"
         Case "resetAssets":      TTResetAssets
@@ -427,6 +514,8 @@ Sub TTUpdateLights()
     For i = 0 To 6
         If TTG.Tilted Then
             TTSetStageLight i, 0
+        ElseIf TTG.SurgeActive Then
+            TTSetStageLight i, 2
         ElseIf TTG.StageDone(i) Then
             TTSetStageLight i, 1
         ElseIf i = nextLit Then
@@ -437,6 +526,44 @@ Sub TTUpdateLights()
     Next
     TTSetOptionalLight "liShootAgain", TTG.ExtraBalls > 0
     TTSetOptionalLight "liBallSave", TTG.BallSaveActive(GameTime)
+
+    ' Locks: on = locked, blinking = lit and waiting
+    For i = 1 To 3
+        If i <= TTG.BallsLocked Then
+            TTSetLightState "liLock" & i, 1
+        ElseIf i <= TTG.BallsLocked + TTG.LocksLit Then
+            TTSetLightState "liLock" & i, 2
+        Else
+            TTSetLightState "liLock" & i, 0
+        End If
+    Next
+
+    ' Air Gap: pink insert blinks while the gate is open
+    If TTG.AirGapOpen Then
+        TTSetLightState "liAirGap", 2
+    ElseIf TTG.AirGapBreached Then
+        TTSetLightState "liAirGap", 1
+    Else
+        TTSetLightState "liAirGap", 0
+    End If
+    TTSetAirGapGate TTG.AirGapOpen
+End Sub
+
+' AirGapGate is a wall: dropped = open.
+Sub TTSetAirGapGate(isOpen)
+    Dim o
+    If TTGateOpen = isOpen Then Exit Sub
+    TTGateOpen = isOpen
+    Set o = TTObj("AirGapGate")
+    If o Is Nothing Then Exit Sub
+    o.IsDropped = isOpen
+End Sub
+
+Sub TTSetLightState(name, state)
+    Dim o
+    Set o = TTObj(name)
+    If o Is Nothing Then Exit Sub
+    If o.State <> state Then o.State = state
 End Sub
 
 ' Left-to-right sweep: the chain reads left to right.
@@ -459,6 +586,11 @@ Sub TTAllLightsOff()
     Next
     TTSetOptionalLight "liShootAgain", False
     TTSetOptionalLight "liBallSave", False
+    For i = 1 To 3
+        TTSetLightState "liLock" & i, 0
+    Next
+    TTSetLightState "liAirGap", 0
+    TTSetAirGapGate False
 End Sub
 
 Sub TTSetOptionalLight(name, isOn)

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threat Tide Leaderboard</title>
+<!--
+  Threat Tide live leaderboard for the booth's second screen.
+
+  The table writes ThreatTide_leaderboard.js after every initials entry. This
+  page re-loads that file every 3 seconds with a <script> tag, so it works
+  straight from disk (file://) with no web server and no internet.
+
+  Data file location, in order:
+    1. ?data=<url or path>   e.g. index.html?data=file:///C:/ThreatTide/data/ThreatTide_leaderboard.js
+    2. ThreatTide_leaderboard.js next to this page
+
+  Open full screen with start_leaderboard.bat.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1A1B1C;
+    --panel: #232527;
+    --line: #34373a;
+    --orange: #FF8818;
+    --pink: #FF9AA3;
+    --text: #F4F4F4;
+    --muted: #9A9EA3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Comfortaa, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+    gap: 2.2vh 3vw;
+    height: 100vh;
+    padding: 4vh 4vw 3vh;
+    background:
+      radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255,136,24,.14), transparent 70%),
+      linear-gradient(180deg, #0B0C0E 0%, var(--bg) 35%, #101A24 100%);
+  }
+  header { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 2vw; }
+  h1 { margin: 0; font-size: 6.4vh; letter-spacing: .12em; color: var(--orange); font-weight: 700; }
+  .tag { font-size: 2.3vh; color: var(--text); letter-spacing: .08em; }
+  .day { font-size: 2vh; color: var(--muted); }
+
+  .panel { min-width: 0; background: rgba(35,37,39,.85); border: 1px solid var(--line); border-radius: 1.4vh; padding: 2.4vh 2vw; min-height: 0; }
+  .panel h2 { margin: 0 0 1.6vh; font-size: 2.2vh; letter-spacing: .14em; color: var(--muted); font-weight: 400; text-transform: uppercase; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 3.4vh; }
+  td { padding: .9vh .6vw; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.rank { width: 3em; color: var(--muted); }
+  td.ini { letter-spacing: .2em; font-weight: 700; }
+  td.score { text-align: right; font-variant-numeric: tabular-nums; color: var(--orange); font-weight: 700; }
+  tr.first td { font-size: 4.4vh; }
+  tr.new td { background: rgba(255,154,163,.12); }
+  tr.new td.ini::after { content: "NEW"; margin-left: .8em; font-size: .45em; letter-spacing: .1em; color: var(--pink); vertical-align: middle; }
+  .empty { color: var(--muted); font-size: 3vh; padding: 4vh 0; text-align: center; }
+
+  .last .who { margin-bottom: 1.2vh; font-size: 3vh; letter-spacing: .2em; font-weight: 700; }
+  .last .big { font-size: 5.6vh; color: var(--orange); font-weight: 700; margin: .4vh 0 1.6vh; font-variant-numeric: tabular-nums; }
+  .last .label { font-size: 1.9vh; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+  .last .worst { font-size: 3vh; color: var(--pink); font-weight: 700; margin: .4vh 0 1.2vh; }
+  ol.path { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  ol.path li { display: grid; grid-template-columns: 2.2em 1fr auto; align-items: baseline; gap: .6vw; font-size: 2.15vh; padding: .55vh 0; border-bottom: 1px dashed var(--line); }
+  ol.path li:last-child { border-bottom: 0; }
+  ol.path li::before { counter-increment: s; content: counter(s); color: var(--bg); background: var(--orange); border-radius: 50%; width: 1.7em; height: 1.7em; display: grid; place-items: center; font-weight: 700; font-size: .85em; }
+  ol.path .stage { color: var(--muted); font-size: .8em; display: block; }
+  ol.path .id { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .badges { display: flex; gap: .8vw; flex-wrap: wrap; margin-top: 1.4vh; }
+  .badge { font-size: 1.8vh; padding: .5vh .8vw; border-radius: 99px; border: 1px solid var(--line); color: var(--text); }
+  .badge.pink { border-color: var(--pink); color: var(--pink); }
+  .badge.orange { border-color: var(--orange); color: var(--orange); }
+
+  footer { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 2vw; font-size: 1.7vh; color: var(--muted); }
+  footer strong { color: var(--text); font-weight: 700; }
+
+  @media (max-width: 800px) {
+    body { overflow: auto; }
+    .wrap { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100vh; padding: 24px 16px; gap: 16px; }
+    h1 { font-size: 32px; } .tag { font-size: 14px; } .day { font-size: 12px; }
+    header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    table { font-size: 18px; } td.rank { width: 2em; } td.ini { letter-spacing: .1em; } tr.first td { font-size: 22px; }
+    .panel { padding: 16px; } .panel h2 { font-size: 12px; }
+    .last .who { font-size: 16px; } .last .big { font-size: 28px; } .last .worst { font-size: 16px; }
+    .last .label { font-size: 11px; } ol.path li { font-size: 13px; } .badge { font-size: 11px; padding: 3px 8px; }
+    footer { flex-direction: column; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>THREAT TIDE</h1>
+      <div class="tag">Today's biggest losses</div>
+    </div>
+    <div class="day" id="day"></div>
+  </header>
+
+  <section class="panel">
+    <h2>Leaderboard</h2>
+    <div id="board"><div class="empty">Waiting for the first attack…</div></div>
+  </section>
+
+  <section class="panel last" id="last">
+    <h2>Latest attack</h2>
+    <div class="empty">Play a game to see your board report here.</div>
+  </section>
+
+  <footer>
+    <span><strong>Want this number for your real environment?</strong> Ask us at the booth.</span>
+    <span>Technique names from MITRE ATT&amp;CK&reg;. Dollar values are game-design numbers, not loss estimates.</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var POLL_MS = 3000;
+  var params = new URLSearchParams(location.search);
+  var dataUrl = params.get("data") || "ThreatTide_leaderboard.js";
+  var lastStamp = null;
+
+  // Same rules as the table: full figure below $10M, then $12.4M, then $1.2B.
+  function money(v) {
+    v = Math.max(0, Math.round(Number(v) || 0));
+    function oneDec(unit) {
+      var tenths = Math.round(v / (unit / 10));
+      return Math.floor(tenths / 10).toLocaleString("en-US") + "." + (tenths % 10);
+    }
+    if (v >= 1e9) return "$" + oneDec(1e9) + "B";
+    if (v >= 1e7) return "$" + oneDec(1e6) + "M";
+    return "$" + v.toLocaleString("en-US");
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+  }
+
+  function prettyDay(key) {
+    if (!key || key.length !== 8) return "";
+    var d = new Date(+key.slice(0, 4), +key.slice(4, 6) - 1, +key.slice(6, 8));
+    return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  }
+
+  function render(data) {
+    var board = data && data.board;
+    var game = data && data.last_game;
+    var isToday = board && board.day === todayKey();
+    document.getElementById("day").textContent = prettyDay(todayKey());
+
+    // Leaderboard (a stale file from yesterday shows as empty)
+    var rows = isToday && board.scores ? board.scores : [];
+    var newRank = game && isToday && game.day === board.day ? game.rank : 0;
+    var html;
+    if (!rows.length) {
+      html = '<div class="empty">No losses yet today. Be the first attacker.</div>';
+    } else {
+      html = "<table>" + rows.map(function (r) {
+        var cls = (r.rank === 1 ? "first " : "") + (r.rank === newRank ? "new" : "");
+        return '<tr class="' + cls + '"><td class="rank">' + r.rank + '</td><td class="ini">' + esc(r.initials) +
+               '</td><td class="score">' + money(r.score) + "</td></tr>";
+      }).join("") + "</table>";
+    }
+    document.getElementById("board").innerHTML = html;
+
+    // Latest game: a mini board report
+    var last = document.getElementById("last");
+    if (!game || !isToday || game.day !== board.day) {
+      last.innerHTML = '<h2>Latest attack</h2><div class="empty">Play a game to see your board report here.</div>';
+      return;
+    }
+    var path = (game.worst_path_techniques || []).map(function (t) {
+      return "<li><span>" + esc(t.technique) + '<span class="stage">' + esc(t.stage) + '</span></span><span class="id">' + esc(t.id) + "</span></li>";
+    }).join("");
+    var badges = '<span class="badge">' + game.assets + " assets compromised</span>";
+    if (game.air_gap) badges += '<span class="badge pink">Air Gap breached</span>';
+    if (game.agreements) badges += '<span class="badge">' + game.agreements + " expert agreements</span>";
+    if (game.storm_surge) badges += '<span class="badge orange">Storm Surge' + (game.tail_jackpot ? " · tail " + money(game.tail_jackpot) : "") + "</span>";
+    last.innerHTML =
+      "<h2>Latest attack</h2>" +
+      '<div class="who">' + esc(game.initials) + (game.rank ? " · #" + game.rank + " today" : "") + "</div>" +
+      '<div class="label">Total realised loss</div><div class="big">' + money(game.score) + "</div>" +
+      (path
+        ? '<div class="label">Your worst day</div><div class="worst">' + money(game.worst_path) + '</div><ol class="path">' + path + "</ol>"
+        : '<div class="label">No attack path completed</div>') +
+      '<div class="badges">' + badges + "</div>";
+  }
+
+  function poll() {
+    var old = document.getElementById("tt-data");
+    if (old) old.remove();
+    var s = document.createElement("script");
+    s.id = "tt-data";
+    s.src = dataUrl + (dataUrl.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now();
+    s.onload = function () {
+      var data = window.TT_LEADERBOARD;
+      var stamp = JSON.stringify(data || null) + todayKey();
+      if (stamp !== lastStamp) {
+        lastStamp = stamp;
+        render(data);
+      }
+    };
+    s.onerror = function () {
+      if (lastStamp === null) { lastStamp = "none"; render(null); }
+    };
+    document.head.appendChild(s);
+  }
+
+  render(null);
+  poll();
+  setInterval(poll, POLL_MS);
+})();
+</script>
+</body>
+</html>

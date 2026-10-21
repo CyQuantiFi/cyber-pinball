@@ -253,8 +253,14 @@ Sub TTDisplayUpdate(g, nowMs)
         TTD_LastScoreText = s
     End If
 
-    info = "BALL " & g.BallNum & "  PATH X" & g.PathMult & "  IMPACT " & TTMoney(g.Impact)
-    If g.BallSaveActive(nowMs) Then info = info & "  IR"
+    If g.SurgeActive Then
+        info = "STORM SURGE " & g.SurgeSecondsLeft(nowMs) & "S  WEATHER X" & g.SurgeMult & "  PEAK X" & g.SurgePeak
+    ElseIf g.MultiballActive Then
+        info = "CONSENSUS JACKPOT " & TTMoney(g.Jackpot) & "  EXPERTS " & g.BallsInPlay
+    Else
+        info = "BALL " & g.BallNum & "  PATH X" & g.PathMult & "  IMPACT " & TTMoney(g.Impact)
+        If g.BallSaveActive(nowMs) Then info = info & "  IR"
+    End If
     If info <> TTD_LastInfoText Then
         TTDSetC TTD_lblInfo, info, 32
         TTD_LastInfoText = info
@@ -263,8 +269,13 @@ Sub TTDisplayUpdate(g, nowMs)
     nextLit = g.NextLitStage()
     If g.Tilted Then
         nxt = "INCIDENT DECLARED"
+    ElseIf g.SurgeActive Then
+        nxt = "CENTRE RAMP: TAIL JACKPOT " & TTMoney(g.SurgeSum * g.SurgePeak)
+    ElseIf g.AirGapOpen Then
+        nxt = "AIR GAP OPEN: " & TTMoney(g.Jackpot * TT_AIRGAP_MULT)
     ElseIf nextLit < TT_STAGE_COUNT Then
         nxt = "NEXT: " & UCase(TT_StageNames(nextLit))
+        If g.LocksLit > 0 And Not g.MultiballActive Then nxt = nxt & " - LOCK LIT"
     Else
         nxt = ""
     End If

@@ -83,15 +83,21 @@ Const TT_INITIALS_TIMEOUT_MS = 45000  ' Auto-accept initials after this
 Const TT_CLAIM_MS = 20000             ' "Scan to claim" screen after initials
 Const TT_ATTRACT_PAGE_MS = 5000       ' Attract page rotation
 
-' ---- Phase 2 / 3 (present, not yet used) -------------------------------------
-Const TT_LOCKS_FOR_MULTIBALL = 3
-Const TT_CONSENSUS_WINDOW_MS = 4000
-Const TT_CONSENSUS_JACKPOT_STEP = 250000
-Const TT_CONSENSUS_DECAY = 0.05
-Const TT_AIRGAP_MULT = 3
-Const TT_WIZARD_AT_PATHS = 3
+' ---- Phase 2: Expert Consensus multiball and Air Gap -------------------------
+Const TT_ASSETS_PER_LOCK = 3            ' Asset drops per lit lock (one full bank)
+Const TT_LOCKS_FOR_MULTIBALL = 3        ' Balls locked at Impact to start multiball
+Const TT_MB_BALLSAVE_MS = 10000         ' IR retainer at multiball start
+Const TT_CONSENSUS_WINDOW_MS = 4000     ' Same stage, different ball, inside this = agreement
+Const TT_CONSENSUS_JACKPOT_START = 500000 ' Jackpot at multiball start
+Const TT_CONSENSUS_JACKPOT_STEP = 250000  ' Added after each agreement
+Const TT_CONSENSUS_DECAY = 0.05         ' Scattered hit (different stage) cuts the jackpot
+Const TT_CONSENSUS_JACKPOT_MIN = 100000 ' Decay floor
+Const TT_AIRGAP_MULT = 3                ' Air Gap pays current jackpot x this
+
+' ---- Phase 3: Storm Surge wizard -----------------------------------------------
+Const TT_WIZARD_AT_PATHS = 3            ' Completed Paths in one game to start it
 Const TT_SURGE_MS = 45000
-Const TT_SURGE_SWING_MS = 5000
+Const TT_SURGE_SWING_MS = 5000          ' Shared multiplier changes this often
 Const TT_SURGE_MULT_MIN = 1
 Const TT_SURGE_MULT_MAX = 10
 
@@ -212,12 +218,24 @@ End Function
 '   "asset"          assets dropped, new Impact
 '   "patch"          stage un-lit, -                   Patch Tuesday
 '   "ballsave_relit" -, -
-'   "saved"          -, -                              drain saved by IR retainer
+'   "saved"          -, -                              drain saved: serve a ball
 '   "bonus"          dollars, seconds                  dwell bonus at drain
 '   "evicted"        -, -                              ball ended
 '   "tilt_warning"   warning number, -
 '   "tilt"           -, -
 '   "gameover"       final score, -
+' Phase 2 - Expert Consensus multiball and Air Gap
+'   "lock_lit"       locks lit, -                      asset bank lit a lock
+'   "lock"           balls locked, -                   hold this ball, serve another
+'   "multiball"      balls to add, -                   3rd lock: release the lock + add balls
+'   "agreement"      jackpot paid, stage               two experts agreed
+'   "multiball_end"  -, -
+'   "airgap"         award, -                          captive SCADA/OT ball collected
+' Phase 3 - Storm Surge wizard
+'   "surge_start"    multiplier, -
+'   "surge_swing"    multiplier, peak                  shared weather changed
+'   "surge_tail"     tail jackpot, peak multiplier     centre ramp collected
+'   "surge_end"      collected (True/False), -
 ' =============================================================================
 
 Class TTGame
@@ -230,7 +248,6 @@ Class TTGame
     Public ExtraBallAwarded
     Public Impact            ' Double, current Impact value
     Public AssetsDropped
-    Public AirGapBreached    ' Phase 2
     Public PathMult
     Public PathsCompleted
     Public WorstPathValue
@@ -240,10 +257,32 @@ Class TTGame
     Public BallSaveUntilMs
     Public BallSaveArmed     ' relit IR retainer, used on next drain
     Public PatchTuesdayOn
+    Public BallsInPlay
+
+    ' Phase 2
+    Public LocksLit          ' Impact will lock the next ball when > 0
+    Public BallsLocked
+    Public MultiballActive
+    Public MultiballsPlayed
+    Public Jackpot           ' consensus jackpot ($)
+    Public AgreementCount    ' this game
+    Public AirGapOpen        ' gate open
+    Public AirGapBreached    ' collected at least once this game
+    Public HitBallId         ' set by the glue before each StageHit (ActiveBall.ID)
+
+    ' Phase 3
+    Public SurgeActive
+    Public SurgePlayed
+    Public SurgeMult
+    Public SurgePeak
+    Public SurgeSum          ' dollars scored during the mode
+    Public SurgeEndMs
+    Public SurgeTail         ' tail jackpot collected this game
 
     ' ---- Test hooks: force the next random pick (-1 = random) ----
     Public CardOverride
     Public PatchOverride
+    Public SurgeOverride
 
     ' ---- Private state ----
     Private m_done()
@@ -256,6 +295,10 @@ Class TTGame
     Private m_reconCount
     Private m_resaveGiven
     Private m_nextPatchMs
+    Private m_mbLastStage
+    Private m_mbLastMs
+    Private m_mbLastBall
+    Private m_nextSwingMs
 
     Private Sub Class_Initialize()
         ReDim m_done(TT_STAGE_COUNT - 1)
@@ -269,7 +312,6 @@ Class TTGame
         ExtraBallAwarded = False
         Impact = CDbl(TT_IMPACT_START)
         AssetsDropped = 0
-        AirGapBreached = False
         PathMult = TT_PATH_MULT_START
         PathsCompleted = 0
         Tilted = False
@@ -277,6 +319,8 @@ Class TTGame
         Launched = False
         BallSaveUntilMs = 0
         BallSaveArmed = False
+        BallsInPlay = 0
+        HitBallId = -1
         m_lastStageMs = 0
         m_lastLateralMs = -1
         m_lastTiltMs = -100000
@@ -285,8 +329,10 @@ Class TTGame
         m_nextPatchMs = 0
         CardOverride = -1
         PatchOverride = -1
+        SurgeOverride = -1
         BallsPerGame = TT_BallsPerGame
         PatchTuesdayOn = TT_PatchTuesdayOn
+        ResetGameModes
         ResetChain
         ClearWorst
     End Sub
@@ -303,10 +349,32 @@ Class TTGame
         ExtraBallAwarded = False
         Impact = CDbl(TT_IMPACT_START)
         AssetsDropped = 0
-        AirGapBreached = False
         PathsCompleted = 0
+        ResetGameModes
         ClearWorst
         StartBall nowMs, False
+    End Sub
+
+    Private Sub ResetGameModes()
+        LocksLit = 0
+        BallsLocked = 0
+        MultiballActive = False
+        MultiballsPlayed = 0
+        Jackpot = CDbl(TT_CONSENSUS_JACKPOT_START)
+        AgreementCount = 0
+        AirGapOpen = False
+        AirGapBreached = False
+        SurgeActive = False
+        SurgePlayed = False
+        SurgeMult = 1
+        SurgePeak = 1
+        SurgeSum = 0
+        SurgeEndMs = 0
+        SurgeTail = 0
+        m_mbLastStage = -1
+        m_mbLastMs = -100000
+        m_mbLastBall = -1
+        m_nextSwingMs = 0
     End Sub
 
     Private Sub StartBall(nowMs, isExtra)
@@ -318,6 +386,7 @@ Class TTGame
         Launched = False
         BallSaveUntilMs = 0
         BallSaveArmed = False
+        BallsInPlay = 1
         m_reconCount = 0
         m_resaveGiven = False
         m_lastStageMs = nowMs
@@ -339,11 +408,25 @@ Class TTGame
         BallSaveActive = (Launched And nowMs < BallSaveUntilMs) Or BallSaveArmed
     End Function
 
-    ' Returns 0 = saved, 1 = next ball (or extra ball), 2 = game over.
+    ' Returns 0 = saved (serve a ball), 1 = next ball (or extra ball),
+    ' 2 = game over, 3 = multiball ball lost, others still in play.
     Public Function Drain(nowMs)
         Dim secs, bonus
         Drain = 2
         If Not IsActive Then Exit Function
+
+        ' Multiball: losing a ball only ends the mode when one is left.
+        If BallsInPlay > 1 Then
+            If Not Tilted And Launched And nowMs < BallSaveUntilMs Then
+                TTEmit "saved", 0, 0
+                Drain = 0
+                Exit Function
+            End If
+            BallsInPlay = BallsInPlay - 1
+            If BallsInPlay = 1 And MultiballActive Then EndMultiball
+            Drain = 3
+            Exit Function
+        End If
 
         If Not Tilted Then
             If Launched And nowMs < BallSaveUntilMs Then
@@ -373,8 +456,11 @@ Class TTGame
         TTEmit "bonus", bonus, secs
         TTEmit "evicted", 0, 0
 
-        ' The Path in progress is lost; banked Paths stay in the score.
+        ' The Path in progress is lost; banked dollars stay.
         ResetChain
+        If MultiballActive Then EndMultiball
+        If SurgeActive Then EndSurge False
+        BallsInPlay = 0
 
         If ExtraBalls > 0 Then
             ExtraBalls = ExtraBalls - 1
@@ -391,13 +477,14 @@ Class TTGame
         End If
     End Function
 
-    ' Call every frame. Runs Patch Tuesday.
+    ' Call every frame. Runs Patch Tuesday and the Storm Surge clock.
     Public Sub Tick(nowMs)
-        If Not IsActive Or Not Launched Or Tilted Then Exit Sub
-        If Not PatchTuesdayOn Then Exit Sub
+        If Not IsActive Or Not Launched Then Exit Sub
+        If SurgeActive Then SurgeTick nowMs
+        If Tilted Or Not PatchTuesdayOn Then Exit Sub
         If nowMs < m_nextPatchMs Then Exit Sub
         m_nextPatchMs = nowMs + TT_PATCH_TUESDAY_MS
-        PatchOne
+        If Not SurgeActive Then PatchOne
     End Sub
 
     ' ======================== Shots ========================
@@ -408,6 +495,18 @@ Class TTGame
         If stage < 0 Or stage >= TT_STAGE_COUNT Then Exit Sub
 
         c = DrawCard(stage)
+        m_lastStageMs = nowMs
+        If MultiballActive Then ConsensusHit stage, nowMs
+
+        ' Storm Surge: every shot is lit, the chain is frozen.
+        If SurgeActive Then
+            value = TTRound(TT_Cards(c)(3) * Impact * SurgeMult)
+            Score = Score + value
+            SurgeSum = SurgeSum + value
+            TTEmit "card", c, value
+            Exit Sub
+        End If
+
         isLit = (stage = NextLitStage())
         value = TT_Cards(c)(3) * Impact
         If Not isLit Then value = value * TT_UNLIT_SHARE
@@ -423,7 +522,6 @@ Class TTGame
 
         value = TTRound(value)
         Score = Score + value
-        m_lastStageMs = nowMs
         TTEmit "card", c, value
 
         If isLit Then
@@ -431,12 +529,14 @@ Class TTGame
             m_value(stage) = value
             m_card(stage) = c
             If stage = ST_IMPACT Then
-                CompletePath
+                CompletePath nowMs
             Else
                 TTEmit "collected", stage, value
                 If stage = ST_RECON Then ReconCollected
             End If
         End If
+
+        If stage = ST_IMPACT Then TryLock nowMs
     End Sub
 
     ' Slingshot: "Detected: EDR"
@@ -449,12 +549,40 @@ Class TTGame
         TTEmit "edr", PathValue(), 0
     End Sub
 
-    ' Asset drop target
+    ' Asset drop target. Every full bank lights a lock.
     Public Sub AssetDropped(nowMs)
         If Not IsActive Or Tilted Then Exit Sub
         AssetsDropped = AssetsDropped + 1
         Impact = Impact + TT_IMPACT_STEP
         TTEmit "asset", AssetsDropped, Impact
+        If (AssetsDropped Mod TT_ASSETS_PER_LOCK) = 0 And Not MultiballActive Then
+            If LocksLit + BallsLocked < TT_LOCKS_FOR_MULTIBALL Then
+                LocksLit = LocksLit + 1
+                TTEmit "lock_lit", LocksLit, 0
+            End If
+        End If
+    End Sub
+
+    ' Captive SCADA / OT ball behind the Air Gap gate.
+    Public Sub AirGapHit(nowMs)
+        Dim award
+        If Not IsActive Or Tilted Or Not AirGapOpen Then Exit Sub
+        award = TTRound(Jackpot * TT_AIRGAP_MULT)
+        Score = Score + award
+        AirGapOpen = False
+        AirGapBreached = True
+        TTEmit "airgap", award, 0
+    End Sub
+
+    ' Centre ramp: collects the Storm Surge tail jackpot.
+    Public Sub CentreRampHit(nowMs)
+        Dim tail
+        If Not IsActive Or Tilted Or Not SurgeActive Then Exit Sub
+        tail = TTRound(SurgeSum * SurgePeak)
+        Score = Score + tail
+        SurgeTail = SurgeTail + tail
+        TTEmit "surge_tail", tail, SurgePeak
+        EndSurge True
     End Sub
 
     ' Tilt bob / plumb hit
@@ -465,6 +593,8 @@ Class TTGame
         TiltWarnings = TiltWarnings + 1
         If TiltWarnings > TT_TILT_WARNINGS Then
             Tilted = True
+            AirGapOpen = False
+            If SurgeActive Then EndSurge False
             TTEmit "tilt", 0, 0
         Else
             TTEmit "tilt_warning", TiltWarnings, 0
@@ -512,9 +642,19 @@ Class TTGame
         WorstPathCard = m_worstCards(i)
     End Function
 
-    ' ======================== Internals ========================
+    ' Seconds left in Storm Surge (0 if not running).
+    Public Function SurgeSecondsLeft(nowMs)
+        If Not SurgeActive Then
+            SurgeSecondsLeft = 0
+        Else
+            SurgeSecondsLeft = Int((SurgeEndMs - nowMs + 999) / 1000)
+            If SurgeSecondsLeft < 0 Then SurgeSecondsLeft = 0
+        End If
+    End Function
 
-    Private Sub CompletePath()
+    ' ======================== Internals: Paths ========================
+
+    Private Sub CompletePath(nowMs)
         Dim award, i, multUsed
         multUsed = PathMult
         award = TTRound(PathValue() * multUsed)
@@ -540,6 +680,8 @@ Class TTGame
         End If
 
         ResetChain
+
+        If PathsCompleted >= TT_WIZARD_AT_PATHS And Not SurgePlayed Then StartSurge nowMs
     End Sub
 
     Private Sub ReconCollected()
@@ -584,6 +726,109 @@ Class TTGame
         m_card(picked) = -1
         TTEmit "patch", picked, 0
     End Sub
+
+    ' ======================== Internals: Expert Consensus ========================
+
+    Private Sub TryLock(nowMs)
+        If LocksLit <= 0 Or MultiballActive Then Exit Sub
+        LocksLit = LocksLit - 1
+        BallsLocked = BallsLocked + 1
+        If BallsLocked >= TT_LOCKS_FOR_MULTIBALL Then
+            StartMultiball nowMs
+        Else
+            TTEmit "lock", BallsLocked, 0
+        End If
+    End Sub
+
+    Private Sub StartMultiball(nowMs)
+        Dim adding
+        adding = TT_LOCKS_FOR_MULTIBALL - 1
+        MultiballActive = True
+        MultiballsPlayed = MultiballsPlayed + 1
+        BallsLocked = 0
+        LocksLit = 0
+        BallsInPlay = BallsInPlay + adding
+        Jackpot = CDbl(TT_CONSENSUS_JACKPOT_START)
+        AirGapOpen = True
+        BallSaveUntilMs = nowMs + TT_MB_BALLSAVE_MS
+        m_mbLastStage = -1
+        m_mbLastMs = -100000
+        m_mbLastBall = -1
+        TTEmit "multiball", adding, 0
+    End Sub
+
+    Private Sub EndMultiball()
+        MultiballActive = False
+        AirGapOpen = False
+        TTEmit "multiball_end", 0, 0
+    End Sub
+
+    ' Same stage as the previous multiball hit, inside the window, by a
+    ' different ball = agreement. A hit on a different stage = scattered.
+    Private Sub ConsensusHit(stage, nowMs)
+        If stage = m_mbLastStage And nowMs - m_mbLastMs <= TT_CONSENSUS_WINDOW_MS _
+           And HitBallId <> m_mbLastBall And HitBallId >= 0 Then
+            Score = Score + Jackpot
+            AgreementCount = AgreementCount + 1
+            TTEmit "agreement", Jackpot, stage
+            Jackpot = Jackpot + TT_CONSENSUS_JACKPOT_STEP
+            m_mbLastStage = -1
+            m_mbLastMs = -100000
+            m_mbLastBall = -1
+            Exit Sub
+        End If
+        If m_mbLastStage >= 0 And stage <> m_mbLastStage Then
+            Jackpot = TTRound(Jackpot * (1 - TT_CONSENSUS_DECAY))
+            If Jackpot < TT_CONSENSUS_JACKPOT_MIN Then Jackpot = CDbl(TT_CONSENSUS_JACKPOT_MIN)
+        End If
+        m_mbLastStage = stage
+        m_mbLastMs = nowMs
+        m_mbLastBall = HitBallId
+    End Sub
+
+    ' ======================== Internals: Storm Surge ========================
+
+    Private Sub StartSurge(nowMs)
+        SurgeActive = True
+        SurgePlayed = True
+        SurgeSum = 0
+        SurgeEndMs = nowMs + TT_SURGE_MS
+        SurgeMult = NextSurgeMult()
+        SurgePeak = SurgeMult
+        m_nextSwingMs = nowMs + TT_SURGE_SWING_MS
+        TTEmit "surge_start", SurgeMult, 0
+    End Sub
+
+    Private Sub SurgeTick(nowMs)
+        If nowMs >= SurgeEndMs Then
+            EndSurge False
+            Exit Sub
+        End If
+        If nowMs >= m_nextSwingMs Then
+            m_nextSwingMs = m_nextSwingMs + TT_SURGE_SWING_MS
+            SurgeMult = NextSurgeMult()
+            If SurgeMult > SurgePeak Then SurgePeak = SurgeMult
+            TTEmit "surge_swing", SurgeMult, SurgePeak
+        End If
+    End Sub
+
+    Private Sub EndSurge(collected)
+        If Not SurgeActive Then Exit Sub
+        SurgeActive = False
+        SurgeMult = 1
+        TTEmit "surge_end", collected, 0
+    End Sub
+
+    Private Function NextSurgeMult()
+        If SurgeOverride >= 0 Then
+            NextSurgeMult = SurgeOverride
+            SurgeOverride = -1
+        Else
+            NextSurgeMult = TT_SURGE_MULT_MIN + Int(Rnd * (TT_SURGE_MULT_MAX - TT_SURGE_MULT_MIN + 1))
+        End If
+    End Function
+
+    ' ======================== Internals: misc ========================
 
     Private Function DrawCard(stage)
         Dim i, n, pick
@@ -675,6 +920,10 @@ Function TTSoundName(cue)
         Case "saved":          TTSoundName = "sfx_ballsave"
         Case "drain":          TTSoundName = "sfx_drain"
         Case "extraball":      TTSoundName = "vo_extra_ball"
+        Case "lock_lit":       TTSoundName = "sfx_lock_lit"
+        Case "lock":           TTSoundName = "vo_expert_locked"     ' "Expert locked"
+        Case "multiball":      TTSoundName = "vo_expert_consensus"  ' "Expert consensus"
+        Case "jackpot":        TTSoundName = "vo_jackpot"
         Case "tilt_warning":   TTSoundName = "sfx_tilt_warning"
         Case "tilt":           TTSoundName = "vo_incident_declared"
         Case "gameover":       TTSoundName = "sfx_gameover"
@@ -984,8 +1233,14 @@ Sub TTDisplayUpdate(g, nowMs)
         TTD_LastScoreText = s
     End If
 
-    info = "BALL " & g.BallNum & "  PATH X" & g.PathMult & "  IMPACT " & TTMoney(g.Impact)
-    If g.BallSaveActive(nowMs) Then info = info & "  IR"
+    If g.SurgeActive Then
+        info = "STORM SURGE " & g.SurgeSecondsLeft(nowMs) & "S  WEATHER X" & g.SurgeMult & "  PEAK X" & g.SurgePeak
+    ElseIf g.MultiballActive Then
+        info = "CONSENSUS JACKPOT " & TTMoney(g.Jackpot) & "  EXPERTS " & g.BallsInPlay
+    Else
+        info = "BALL " & g.BallNum & "  PATH X" & g.PathMult & "  IMPACT " & TTMoney(g.Impact)
+        If g.BallSaveActive(nowMs) Then info = info & "  IR"
+    End If
     If info <> TTD_LastInfoText Then
         TTDSetC TTD_lblInfo, info, 32
         TTD_LastInfoText = info
@@ -994,8 +1249,13 @@ Sub TTDisplayUpdate(g, nowMs)
     nextLit = g.NextLitStage()
     If g.Tilted Then
         nxt = "INCIDENT DECLARED"
+    ElseIf g.SurgeActive Then
+        nxt = "CENTRE RAMP: TAIL JACKPOT " & TTMoney(g.SurgeSum * g.SurgePeak)
+    ElseIf g.AirGapOpen Then
+        nxt = "AIR GAP OPEN: " & TTMoney(g.Jackpot * TT_AIRGAP_MULT)
     ElseIf nextLit < TT_STAGE_COUNT Then
         nxt = "NEXT: " & UCase(TT_StageNames(nextLit))
+        If g.LocksLit > 0 And Not g.MultiballActive Then nxt = nxt & " - LOCK LIT"
     Else
         nxt = ""
     End If
@@ -1200,7 +1460,7 @@ End Sub
 ' Each game also writes, in the data folder:
 '   ThreatTide_games.jsonl       one JSON line per game (append)
 '   ThreatTide_highscores.json   today's table (rewritten)
-' The Phase 3 leaderboard page reads these files.
+'   ThreatTide_leaderboard.js    today's table + last game, for leaderboard/index.html
 ' =============================================================================
 
 Const TTHS_COUNT = 10
@@ -1356,6 +1616,10 @@ Function TTGameJson(g, initials, rank)
         ",""worst_path_techniques"":[" & path & "]" & _
         ",""paths"":" & g.PathsCompleted & _
         ",""assets"":" & g.AssetsDropped & _
+        ",""multiballs"":" & g.MultiballsPlayed & _
+        ",""agreements"":" & g.AgreementCount & _
+        ",""storm_surge"":" & TTJsonBool(g.SurgePlayed) & _
+        ",""tail_jackpot"":" & TTDigits(g.SurgeTail) & _
         ",""air_gap"":" & TTJsonBool(g.AirGapBreached) & "}"
     TTGameJson = j
 End Function
@@ -1377,16 +1641,27 @@ Function TTHighScoresJson()
                        ",""scores"":[" & rows & vbCrLf & "]}" & vbCrLf
 End Function
 
+' Data for leaderboard/index.html. A .js file (not .json) so the page can load
+' it straight from disk with a <script> tag: no web server needed.
+Function TTLeaderboardJs(gameJson)
+    TTLeaderboardJs = "window.TT_LEADERBOARD = {""board"":" & TTHighScoresJson() & _
+                      ",""last_game"":" & gameJson & "};" & vbCrLf
+End Function
+
 ' Append the game and rewrite today's table. Never lets a disk error stop play.
 Sub TTScoresWriteFiles(g, initials, rank)
-    Dim fso, f
+    Dim fso, f, j
     On Error Resume Next
+    j = TTGameJson(g, initials, rank)
     Set fso = CreateObject("Scripting.FileSystemObject")
     Set f = fso.OpenTextFile(TTDataPath("ThreatTide_games.jsonl"), 8, True)
-    f.WriteLine TTGameJson(g, initials, rank)
+    f.WriteLine j
     f.Close
     Set f = fso.CreateTextFile(TTDataPath("ThreatTide_highscores.json"), True)
     f.Write TTHighScoresJson()
+    f.Close
+    Set f = fso.CreateTextFile(TTDataPath("ThreatTide_leaderboard.js"), True)
+    f.Write TTLeaderboardJs(j)
     f.Close
     Err.Clear
     On Error GoTo 0
@@ -1411,14 +1686,18 @@ Dim TTLastInitials
 Dim TTAssetDown(2)
 Dim TTNudgeTimes(2), TTNudgeHead
 Dim TTStageLightNames, TTStageLights(6), TTStageLightState(6)
+Dim TTLockHold              ' set when the rules lock the ball sitting in kImpact
+Dim TTTaskSeq               ' makes repeatable task names unique
+Dim TTGateOpen              ' last Air Gap gate state applied
 
-' Phase 1 objects. Startup check reports any that are missing.
+' Startup check reports any of these that are missing.
 Function TTRequiredObjects()
     TTRequiredObjects = Array( _
         "LeftFlipper", "RightFlipper", "Plunger", "BallRelease", "Drain", "swPlungerLane", _
         "swRecon", "swInitialAccess", "swExecution", "kPersistence", "swPrivEsc", "swLateral", "kImpact", _
         "liRecon", "liInitialAccess", "liExecution", "liPersistence", "liPrivEsc", "liLateral", "liImpact", _
-        "dtAsset1", "dtAsset2", "dtAsset3", "LeftSlingshot", "RightSlingshot", "tmrTick")
+        "dtAsset1", "dtAsset2", "dtAsset3", "LeftSlingshot", "RightSlingshot", "tmrTick", _
+        "liLock1", "liLock2", "liLock3", "AirGapGate", "liAirGap", "swAirGap", "swCentreRamp")
 End Function
 
 ' ---------------------------------------------------------------- table events
@@ -1440,6 +1719,10 @@ Sub Table1_Init()
         TTNudgeTimes(i) = -100000
     Next
     TTNudgeHead = 0
+    TTTaskSeq = 0
+    TTLockHold = False
+    TTGateOpen = True
+    TTSetAirGapGate False
 
     TTScoresLoad
     TTDisplayInit
@@ -1564,13 +1847,42 @@ Sub kPersistence_Hit()
     TTSchedule "kickPersistence", TT_SAUCER_HOLD_MS
 End Sub
 
+' Impact scoop doubles as the lock. A locked ball is removed and a new one
+' served to the plunger (virtual lock); the 3rd lock starts multiball.
 Sub kImpact_Hit()
+    TTLockHold = False
     TTStage ST_IMPACT
-    TTSchedule "kickImpact", TT_SAUCER_HOLD_MS
+    If TTLockHold Then
+        kImpact.DestroyBall
+        TTScheduleSeq "release", 1200
+    Else
+        TTSchedule "kickImpact", TT_SAUCER_HOLD_MS
+    End If
 End Sub
 
 Sub TTStage(stage)
-    If TTMode = "game" Then TTG.StageHit stage, GameTime
+    If TTMode <> "game" Then Exit Sub
+    TTG.HitBallId = TTActiveBallId()
+    TTG.StageHit stage, GameTime
+End Sub
+
+' Which ball made the shot (Expert Consensus needs different balls).
+Function TTActiveBallId()
+    TTActiveBallId = -1
+    On Error Resume Next
+    TTActiveBallId = ActiveBall.ID
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' Phase 2: captive SCADA / OT ball behind the Air Gap gate
+Sub swAirGap_Hit()
+    If TTMode = "game" Then TTG.AirGapHit GameTime
+End Sub
+
+' Phase 3: centre ramp collects the Storm Surge tail jackpot
+Sub swCentreRamp_Hit()
+    If TTMode = "game" Then TTG.CentreRampHit GameTime
 End Sub
 
 Sub dtAsset1_Hit() : TTAssetHit 0 : End Sub
@@ -1612,6 +1924,13 @@ Sub Drain_Hit()
     If TTMode = "game" Then TTG.Drain GameTime
 End Sub
 
+' Multiball: extra experts come out of the Impact scoop.
+Sub TTAddMultiballBall()
+    kImpact.CreateBall
+    kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE
+    TTPlay "kicker"
+End Sub
+
 Sub TTReleaseBall()
     BallRelease.CreateBall
     BallRelease.Kick TT_RELEASE_ANGLE, TT_RELEASE_FORCE
@@ -1629,7 +1948,7 @@ Sub TTEmit(kind, a, b)
             Else
                 TTDisplayMessage "BALL " & a, "HIT THE LIT SHOT", TT_MSG_SHOW_MS, t
             End If
-            TTSchedule "release", 1500
+            TTScheduleSeq "release", 1500
         Case "card"
             TTDisplayCard UCase(TTCardName(a)), TTCardId(a) & "   +" & TTMoney(b), t
             TTPlay "card"
@@ -1658,7 +1977,7 @@ Sub TTEmit(kind, a, b)
         Case "saved"
             TTDisplayMessage "IR RETAINER", "BALL SAVED", TT_MSG_SHOW_MS, t
             TTPlay "saved"
-            TTSchedule "release", 1000
+            TTScheduleSeq "release", 1000
         Case "bonus"
             TTDisplayMessage "DWELL TIME", b & " SEC UNDETECTED  +" & TTMoney(a), TT_MSG_SHOW_MS, t
         Case "evicted"
@@ -1671,6 +1990,38 @@ Sub TTEmit(kind, a, b)
             TTPlay "tilt"
             LeftFlipper.RotateToStart
             RightFlipper.RotateToStart
+        Case "lock_lit"
+            TTDisplayMessage "LOCK IS LIT", "SHOOT IMPACT TO LOCK AN EXPERT", TT_MSG_SHOW_MS, t
+            TTPlay "lock_lit"
+        Case "lock"
+            TTLockHold = True
+            TTDisplayMessage "EXPERT " & a & " LOCKED", (TT_LOCKS_FOR_MULTIBALL - a) & " MORE FOR CONSENSUS", TT_MSG_SHOW_MS, t
+            TTPlay "lock"
+        Case "multiball"
+            TTDisplayMessage "EXPERT CONSENSUS", "SAME SHOT, DIFFERENT BALLS = JACKPOT", 2500, t
+            TTPlay "multiball"
+            TTScheduleSeq "mbAdd", 1500
+            If a > 1 Then TTScheduleSeq "mbAdd", 3000
+        Case "agreement"
+            TTDisplayMessage "AGREEMENT", "JACKPOT " & TTMoney(a), TT_MSG_SHOW_MS, t
+            TTPlay "jackpot"
+        Case "multiball_end"
+            TTDisplayMessage "CONSENSUS CLOSED", "AIR GAP SEALED", TT_MSG_SHOW_MS, t
+        Case "airgap"
+            TTDisplayMessage "AIR GAP BREACHED " & TTMoney(a), "QUANTIFIED THE ASSET YOU CAN'T SCAN", 3500, t
+            TTPlay "air_gap"
+        Case "surge_start"
+            TTDisplayMessage "STORM SURGE", "45 SEC - CENTRE RAMP FOR TAIL JACKPOT", 2500, t
+            TTPlay "storm_surge"
+            TTMusic "surge.mp3"
+        Case "surge_swing"
+            TTDisplayMessage "SHARED WEATHER X" & a, "PEAK X" & b, 1000, t
+        Case "surge_tail"
+            TTDisplayMessage "TAIL JACKPOT " & TTMoney(a), "SUM OF THE STORM X" & b & " PEAK", 3500, t
+            TTPlay "jackpot"
+        Case "surge_end"
+            If Not a Then TTDisplayMessage "STORM PASSED", "TAIL JACKPOT MISSED", TT_MSG_SHOW_MS, t
+            TTMusic "theme.mp3"
         Case "gameover"
             TTMode = "gameover_wait"
             TTPlay "gameover"
@@ -1781,6 +2132,12 @@ Sub TTSchedule(name, delayMs)
     TTTasks(name) = GameTime + delayMs
 End Sub
 
+' For tasks that can overlap (ball serves), e.g. "release#12"
+Sub TTScheduleSeq(name, delayMs)
+    TTTaskSeq = TTTaskSeq + 1
+    TTTasks(name & "#" & TTTaskSeq) = GameTime + delayMs
+End Sub
+
 Sub TTRunTasks(t)
     Dim k
     For Each k In TTTasks.Keys
@@ -1793,9 +2150,14 @@ Sub TTRunTasks(t)
     Next
 End Sub
 
-Sub TTRunTask(name)
+Sub TTRunTask(fullName)
+    Dim name, p
+    name = fullName
+    p = InStr(fullName, "#")
+    If p > 0 Then name = Left(fullName, p - 1)
     Select Case name
         Case "release":          TTReleaseBall
+        Case "mbAdd":            TTAddMultiballBall
         Case "kickPersistence":  kPersistence.Kick TT_KICK_PERSISTENCE_ANGLE, TT_KICK_PERSISTENCE_FORCE : TTPlay "kicker"
         Case "kickImpact":       kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE : TTPlay "kicker"
         Case "resetAssets":      TTResetAssets
@@ -1824,6 +2186,8 @@ Sub TTUpdateLights()
     For i = 0 To 6
         If TTG.Tilted Then
             TTSetStageLight i, 0
+        ElseIf TTG.SurgeActive Then
+            TTSetStageLight i, 2
         ElseIf TTG.StageDone(i) Then
             TTSetStageLight i, 1
         ElseIf i = nextLit Then
@@ -1834,6 +2198,44 @@ Sub TTUpdateLights()
     Next
     TTSetOptionalLight "liShootAgain", TTG.ExtraBalls > 0
     TTSetOptionalLight "liBallSave", TTG.BallSaveActive(GameTime)
+
+    ' Locks: on = locked, blinking = lit and waiting
+    For i = 1 To 3
+        If i <= TTG.BallsLocked Then
+            TTSetLightState "liLock" & i, 1
+        ElseIf i <= TTG.BallsLocked + TTG.LocksLit Then
+            TTSetLightState "liLock" & i, 2
+        Else
+            TTSetLightState "liLock" & i, 0
+        End If
+    Next
+
+    ' Air Gap: pink insert blinks while the gate is open
+    If TTG.AirGapOpen Then
+        TTSetLightState "liAirGap", 2
+    ElseIf TTG.AirGapBreached Then
+        TTSetLightState "liAirGap", 1
+    Else
+        TTSetLightState "liAirGap", 0
+    End If
+    TTSetAirGapGate TTG.AirGapOpen
+End Sub
+
+' AirGapGate is a wall: dropped = open.
+Sub TTSetAirGapGate(isOpen)
+    Dim o
+    If TTGateOpen = isOpen Then Exit Sub
+    TTGateOpen = isOpen
+    Set o = TTObj("AirGapGate")
+    If o Is Nothing Then Exit Sub
+    o.IsDropped = isOpen
+End Sub
+
+Sub TTSetLightState(name, state)
+    Dim o
+    Set o = TTObj(name)
+    If o Is Nothing Then Exit Sub
+    If o.State <> state Then o.State = state
 End Sub
 
 ' Left-to-right sweep: the chain reads left to right.
@@ -1856,6 +2258,11 @@ Sub TTAllLightsOff()
     Next
     TTSetOptionalLight "liShootAgain", False
     TTSetOptionalLight "liBallSave", False
+    For i = 1 To 3
+        TTSetLightState "liLock" & i, 0
+    Next
+    TTSetLightState "liAirGap", 0
+    TTSetAirGapGate False
 End Sub
 
 Sub TTSetOptionalLight(name, isOn)

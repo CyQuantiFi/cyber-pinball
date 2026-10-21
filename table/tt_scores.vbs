@@ -6,7 +6,7 @@
 ' Each game also writes, in the data folder:
 '   ThreatTide_games.jsonl       one JSON line per game (append)
 '   ThreatTide_highscores.json   today's table (rewritten)
-' The Phase 3 leaderboard page reads these files.
+'   ThreatTide_leaderboard.js    today's table + last game, for leaderboard/index.html
 ' =============================================================================
 
 Const TTHS_COUNT = 10
@@ -162,6 +162,10 @@ Function TTGameJson(g, initials, rank)
         ",""worst_path_techniques"":[" & path & "]" & _
         ",""paths"":" & g.PathsCompleted & _
         ",""assets"":" & g.AssetsDropped & _
+        ",""multiballs"":" & g.MultiballsPlayed & _
+        ",""agreements"":" & g.AgreementCount & _
+        ",""storm_surge"":" & TTJsonBool(g.SurgePlayed) & _
+        ",""tail_jackpot"":" & TTDigits(g.SurgeTail) & _
         ",""air_gap"":" & TTJsonBool(g.AirGapBreached) & "}"
     TTGameJson = j
 End Function
@@ -183,16 +187,27 @@ Function TTHighScoresJson()
                        ",""scores"":[" & rows & vbCrLf & "]}" & vbCrLf
 End Function
 
+' Data for leaderboard/index.html. A .js file (not .json) so the page can load
+' it straight from disk with a <script> tag: no web server needed.
+Function TTLeaderboardJs(gameJson)
+    TTLeaderboardJs = "window.TT_LEADERBOARD = {""board"":" & TTHighScoresJson() & _
+                      ",""last_game"":" & gameJson & "};" & vbCrLf
+End Function
+
 ' Append the game and rewrite today's table. Never lets a disk error stop play.
 Sub TTScoresWriteFiles(g, initials, rank)
-    Dim fso, f
+    Dim fso, f, j
     On Error Resume Next
+    j = TTGameJson(g, initials, rank)
     Set fso = CreateObject("Scripting.FileSystemObject")
     Set f = fso.OpenTextFile(TTDataPath("ThreatTide_games.jsonl"), 8, True)
-    f.WriteLine TTGameJson(g, initials, rank)
+    f.WriteLine j
     f.Close
     Set f = fso.CreateTextFile(TTDataPath("ThreatTide_highscores.json"), True)
     f.Write TTHighScoresJson()
+    f.Close
+    Set f = fso.CreateTextFile(TTDataPath("ThreatTide_leaderboard.js"), True)
+    f.Write TTLeaderboardJs(j)
     f.Close
     Err.Clear
     On Error GoTo 0
