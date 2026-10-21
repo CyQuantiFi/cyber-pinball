@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+# VPX writes these next to the table while running
+*.vpx.bak
+ThreatTide_games.jsonl
+ThreatTide_highscores.json

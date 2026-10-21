@@ -1,0 +1,26 @@
+<?xml version="1.0" ?>
+<!--
+  Threat Tide rules tests. Run on Windows from the tests folder:
+      cd tests
+      cscript //nologo run_tests.wsf
+  Exit code 0 = all passed.
+-->
+<package>
+  <job id="tests">
+    <script language="VBScript" src="../table/tt_config.vbs"/>
+    <script language="VBScript" src="../table/tt_money.vbs"/>
+    <script language="VBScript" src="../table/tt_rules.vbs"/>
+    <script language="VBScript" src="../table/tt_scores.vbs"/>
+    <script language="VBScript" src="test_lib.vbs"/>
+    <script language="VBScript" src="test_money.vbs"/>
+    <script language="VBScript" src="test_rules.vbs"/>
+    <script language="VBScript" src="test_scores.vbs"/>
+    <script language="VBScript"><![CDATA[
+      Randomize
+      RunMoneyTests
+      RunRulesTests
+      RunScoresTests
+      T_Finish
+    ]]></script>
+  </job>
+</package>
