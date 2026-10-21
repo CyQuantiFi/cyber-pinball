@@ -54,6 +54,9 @@ Sub Table1_Init()
 
     TTScoresLoad
     TTDisplayInit
+    TTFeelInit
+    TTCaptiveBallInit
+    TTBackglassStart
     tmrTick.Interval = 33
     tmrTick.Enabled = True
 
@@ -72,6 +75,7 @@ End Sub
 Sub Table1_Exit()
     TTScoresSave
     TTDisplayExit
+    TTBackglassStop
 End Sub
 
 ' VPX 10.8 table options menu (operator settings). Ignored on older builds.
@@ -114,7 +118,10 @@ End Sub
 ' ---------------------------------------------------------------- keys
 
 Sub Table1_KeyDown(ByVal keycode)
-    If keycode = PlungerKey Then Plunger.PullBack
+    If keycode = PlungerKey Then
+        Plunger.PullBack
+        TTPlay "plunger_pull"
+    End If
     If keycode = LeftTiltKey Then Nudge 90, 2 : TTNudged
     If keycode = RightTiltKey Then Nudge 270, 2 : TTNudged
     If keycode = CenterTiltKey Then Nudge 0, 2 : TTNudged
@@ -141,9 +148,18 @@ Sub Table1_KeyDown(ByVal keycode)
 End Sub
 
 Sub Table1_KeyUp(ByVal keycode)
-    If keycode = PlungerKey Then Plunger.Fire
-    If keycode = LeftFlipperKey Then LeftFlipper.RotateToStart
-    If keycode = RightFlipperKey Then RightFlipper.RotateToStart
+    If keycode = PlungerKey Then
+        Plunger.Fire
+        TTPlay "plunger"
+    End If
+    If keycode = LeftFlipperKey Then
+        If LeftFlipper.CurrentAngle <> LeftFlipper.StartAngle Then TTPlay "flipper_down"
+        LeftFlipper.RotateToStart
+    End If
+    If keycode = RightFlipperKey Then
+        If RightFlipper.CurrentAngle <> RightFlipper.StartAngle Then TTPlay "flipper_down"
+        RightFlipper.RotateToStart
+    End If
 End Sub
 
 Function TTFlippersLive()
@@ -207,6 +223,42 @@ Function TTActiveBallId()
     On Error GoTo 0
 End Function
 
+' B2S backglass (ThreatTide.directb2s next to the .vpx). Original tables start
+' the B2S server themselves; if it isn't installed the table runs without it.
+Dim TTB2S
+Sub TTBackglassStart()
+    Set TTB2S = Nothing
+    If Not TT_UseB2S Then Exit Sub
+    On Error Resume Next
+    Set TTB2S = CreateObject("B2S.Server")
+    If Err.Number <> 0 Then
+        Set TTB2S = Nothing
+    Else
+        TTB2S.B2SName = "ThreatTide"
+        TTB2S.Run
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Sub TTBackglassStop()
+    On Error Resume Next
+    If Not TTB2S Is Nothing Then TTB2S.Stop
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' The captive SCADA / OT ball is created once by the kAirGapCaptive kicker,
+' which then lets go of it and switches off so it can't catch it again.
+Sub TTCaptiveBallInit()
+    Dim k
+    Set k = TTObj("kAirGapCaptive")
+    If k Is Nothing Then Exit Sub
+    k.CreateBall
+    k.Kick 180, 1
+    k.Enabled = False
+End Sub
+
 ' Phase 2: captive SCADA / OT ball behind the Air Gap gate
 Sub swAirGap_Hit()
     If TTMode = "game" Then TTG.AirGapHit GameTime
@@ -241,12 +293,12 @@ Sub TTResetAssets()
 End Sub
 
 Sub LeftSlingshot_Slingshot()
-    TTPlay "sling"
+    TTFeelSling False
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 
 Sub RightSlingshot_Slingshot()
-    TTPlay "sling"
+    TTFeelSling True
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 

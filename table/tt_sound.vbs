@@ -20,7 +20,6 @@ Function TTSoundName(cue)
         Case "asset":          TTSoundName = "sfx_asset"
         Case "patch":          TTSoundName = "sfx_patch"
         Case "saved":          TTSoundName = "sfx_ballsave"
-        Case "drain":          TTSoundName = "sfx_drain"
         Case "extraball":      TTSoundName = "vo_extra_ball"
         Case "lock_lit":       TTSoundName = "sfx_lock_lit"
         Case "lock":           TTSoundName = "vo_expert_locked"     ' "Expert locked"
@@ -29,11 +28,15 @@ Function TTSoundName(cue)
         Case "tilt_warning":   TTSoundName = "sfx_tilt_warning"
         Case "tilt":           TTSoundName = "vo_incident_declared"
         Case "gameover":       TTSoundName = "sfx_gameover"
-        Case "flipper":        TTSoundName = "sfx_flipper"
-        Case "sling":          TTSoundName = "sfx_sling"
-        Case "kicker":         TTSoundName = "sfx_kicker"
-        Case "droptarget":     TTSoundName = "sfx_droptarget"
-        Case "release":        TTSoundName = "sfx_ballrelease"
+        ' Mechanical sounds: recorded samples that come with the VPX blank table
+        Case "flipper":        TTSoundName = "fx_Flipperup"
+        Case "flipper_down":   TTSoundName = "fx_Flipperdown"
+        Case "plunger_pull":   TTSoundName = "plungerpull"
+        Case "plunger":        TTSoundName = "plunger"
+        Case "kicker":         TTSoundName = "popper_ball"
+        Case "droptarget":     TTSoundName = "target"
+        Case "release":        TTSoundName = "ballrelease"
+        Case "drain":          TTSoundName = "drain"
         Case Else:             TTSoundName = ""
     End Select
 End Function

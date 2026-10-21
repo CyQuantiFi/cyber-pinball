@@ -4,6 +4,8 @@ The table script finds playfield objects by name. Build the geometry however pla
 
 The table object itself must be named **`Table1`**.
 
+`tools/build_table.py` already creates every object below on the VPX blank table, positioned by `tools/table_layout.py`. This list is the contract for anyone editing the table by hand.
+
 ## Phase 1
 
 ### Core
@@ -63,7 +65,8 @@ Light states the script sets: `0` off, `1` collected, `2` blinking = shoot this 
 | `AirGapGate` | **Wall** | Pink gate in front of the captive ball. The script drops it (`IsDropped = True`) to open during multiball and raises it to close. |
 | `liAirGap` | Light | Pink Air Gap insert: blinks while open, solid once breached. |
 | `swAirGap` | Trigger or target | Hit by the captive SCADA / OT ball when the player shoots it. |
-| *(captive ball)* | Kicker + ball, or walls | The unscannable asset behind the gate. Not referenced by the script; place it so a direct hit drives it into `swAirGap`. |
+| `kAirGapCaptive` | Kicker (invisible) | Optional. On table start the script creates the captive ball here, drops it onto the two posts and switches the kicker off. |
+| `PostAirGap1`, `PostAirGap2` | Wall | Posts the captive ball rests on; the gap between them is narrower than a ball, so the player's ball hits the captive ball but can't pass. |
 
 Multiball needs at least 3 balls on the table at once; VPX creates them on demand, so there is no physical trough to size.
 

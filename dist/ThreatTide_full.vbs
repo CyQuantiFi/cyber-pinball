@@ -107,6 +107,7 @@ Dim TT_PatchTuesdayOn : TT_PatchTuesdayOn = True
 Dim TT_VolumePreset : TT_VolumePreset = "booth"   ' "booth" (loud hall) or "quiet"
 Dim TT_ContestMode : TT_ContestMode = True        ' High scores reset each day
 Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
+Dim TT_UseB2S : TT_UseB2S = True                  ' Show ThreatTide.directb2s on the backglass screen
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
 ' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----
@@ -116,7 +117,12 @@ Dim TT_MusicSurge : TT_MusicSurge = ""            ' Storm Surge track; "" keeps 
 ' ---- Display -----------------------------------------------------------------
 Const TT_DMD_W = 256
 Const TT_DMD_H = 64
-' FlexDMD fonts. Swap for Comfortaa BMFont files when the art pack is ready.
+' FlexDMD assets folder, relative to the .vpx (copy the repo's dmd\ folder here)
+Const TT_DMD_ASSETS = "./ThreatTide/"
+' Brand fonts (Comfortaa BMFonts from tools/make_dmd_fonts.py). If they're
+' missing, the built-in pixel fonts below are used instead.
+Const TT_FONT_BRAND_BIG = "comfortaa_bold_24.fnt"
+Const TT_FONT_BRAND_HEAD = "comfortaa_bold_14.fnt"
 Const TT_FONT_BIG = "FlexDMD.Resources.udmd-f12by24.fnt"
 Const TT_FONT_MED = "FlexDMD.Resources.udmd-f6by12.fnt"
 Const TT_FONT_SMALL = "FlexDMD.Resources.udmd-f5by7.fnt"
@@ -127,8 +133,8 @@ Const TT_QR_IMAGE = "VPX.qr_form"   ' Image named qr_form in the table's image m
 ' Kicker eject: angle in degrees (0 = up), force.
 Const TT_KICK_PERSISTENCE_ANGLE = 180
 Const TT_KICK_PERSISTENCE_FORCE = 12
-Const TT_KICK_IMPACT_ANGLE = 200
-Const TT_KICK_IMPACT_FORCE = 14
+Const TT_KICK_IMPACT_ANGLE = 214
+Const TT_KICK_IMPACT_FORCE = 10
 Const TT_RELEASE_ANGLE = 90
 Const TT_RELEASE_FORCE = 7
 Const TT_SAUCER_HOLD_MS = 900
@@ -922,7 +928,6 @@ Function TTSoundName(cue)
         Case "asset":          TTSoundName = "sfx_asset"
         Case "patch":          TTSoundName = "sfx_patch"
         Case "saved":          TTSoundName = "sfx_ballsave"
-        Case "drain":          TTSoundName = "sfx_drain"
         Case "extraball":      TTSoundName = "vo_extra_ball"
         Case "lock_lit":       TTSoundName = "sfx_lock_lit"
         Case "lock":           TTSoundName = "vo_expert_locked"     ' "Expert locked"
@@ -931,11 +936,15 @@ Function TTSoundName(cue)
         Case "tilt_warning":   TTSoundName = "sfx_tilt_warning"
         Case "tilt":           TTSoundName = "vo_incident_declared"
         Case "gameover":       TTSoundName = "sfx_gameover"
-        Case "flipper":        TTSoundName = "sfx_flipper"
-        Case "sling":          TTSoundName = "sfx_sling"
-        Case "kicker":         TTSoundName = "sfx_kicker"
-        Case "droptarget":     TTSoundName = "sfx_droptarget"
-        Case "release":        TTSoundName = "sfx_ballrelease"
+        ' Mechanical sounds: recorded samples that come with the VPX blank table
+        Case "flipper":        TTSoundName = "fx_Flipperup"
+        Case "flipper_down":   TTSoundName = "fx_Flipperdown"
+        Case "plunger_pull":   TTSoundName = "plungerpull"
+        Case "plunger":        TTSoundName = "plunger"
+        Case "kicker":         TTSoundName = "popper_ball"
+        Case "droptarget":     TTSoundName = "target"
+        Case "release":        TTSoundName = "ballrelease"
+        Case "drain":          TTSoundName = "drain"
         Case Else:             TTSoundName = ""
     End Select
 End Function
@@ -992,6 +1001,233 @@ Sub TTMusicLoop()
 End Sub
 
 ' ----------------------------------------------------------------------------
+' tt_feel.vbs
+' ----------------------------------------------------------------------------
+' =============================================================================
+' Threat Tide - table feel: GI, sling animation, ball shadows, rolling and
+' contact sounds.
+'
+' Adapted from the Visual Pinball X blank table script (fuzzel, jimmyfingers,
+' jpsalas, toxie, unclewilly; rolling sounds by jpsalas, ball shadow and
+' flipper shadows by ninuzzu, ball drop sounds by rothbauerw). It drives the
+' stock objects that come with the VPX blank table (GI lights, sling rubbers
+' and arms, ball shadow primitives, the RollingTimer and BallShadowUpdate
+' timers, and the Rubbers/Posts/Pins/... collections). Anything missing is
+' skipped, so a table built without those objects still runs.
+' =============================================================================
+
+Const TTF_BALLSIZE = 25          ' ball radius
+Const TTF_MAXBALLS = 5           ' rolling sound / shadow slots
+Dim TTF_Rolling(5)
+Dim TTF_RStep, TTF_LStep
+
+Sub TTFeelInit()
+    Dim xx, i
+    For i = 0 To TTF_MAXBALLS
+        TTF_Rolling(i) = False
+    Next
+    On Error Resume Next
+    For Each xx In GI
+        xx.State = 1
+    Next
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' ---------------------------------------------------------------- slings
+
+' Called from the sling handlers in tt_table.vbs
+Sub TTFeelSling(isRight)
+    On Error Resume Next
+    If isRight Then
+        PlaySound "right_slingshot", 0, 1, 0.05, 0.05
+        RSling.Visible = 0
+        RSling1.Visible = 1
+        Sling1.RotX = 20
+        TTF_RStep = 0
+        RightSlingShot.TimerEnabled = 1
+        Gi1.State = 0 : Gi2.State = 0
+    Else
+        PlaySound "left_slingshot", 0, 1, -0.05, 0.05
+        LSling.Visible = 0
+        LSling1.Visible = 1
+        Sling2.RotX = 20
+        TTF_LStep = 0
+        LeftSlingShot.TimerEnabled = 1
+        Gi3.State = 0 : Gi4.State = 0
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Sub RightSlingShot_Timer()
+    On Error Resume Next
+    Select Case TTF_RStep
+        Case 3: RSling1.Visible = 0 : RSling2.Visible = 1 : Sling1.RotX = 10
+        Case 4: RSling2.Visible = 0 : RSling.Visible = 1 : Sling1.RotX = 0 : RightSlingShot.TimerEnabled = 0 : Gi1.State = 1 : Gi2.State = 1
+    End Select
+    TTF_RStep = TTF_RStep + 1
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Sub LeftSlingShot_Timer()
+    On Error Resume Next
+    Select Case TTF_LStep
+        Case 3: LSling1.Visible = 0 : LSling2.Visible = 1 : Sling2.RotX = 10
+        Case 4: LSling2.Visible = 0 : LSling.Visible = 1 : Sling2.RotX = 0 : LeftSlingShot.TimerEnabled = 0 : Gi3.State = 1 : Gi4.State = 1
+    End Select
+    TTF_LStep = TTF_LStep + 1
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' ---------------------------------------------------------------- positional audio
+
+Function AudioFade(tableobj)   ' front/back by Y position
+    Dim tmp
+    tmp = tableobj.y * 2 / Table1.height - 1
+    If tmp > 0 Then
+        AudioFade = CSng(tmp ^ 10)
+    Else
+        AudioFade = CSng(-((-tmp) ^ 10))
+    End If
+End Function
+
+Function AudioPan(tableobj)    ' left/right by X position
+    Dim tmp
+    tmp = tableobj.x * 2 / Table1.width - 1
+    If tmp > 0 Then
+        AudioPan = CSng(tmp ^ 10)
+    Else
+        AudioPan = CSng(-((-tmp) ^ 10))
+    End If
+End Function
+
+Function BallVel(ball)
+    BallVel = Int(Sqr((ball.VelX ^ 2) + (ball.VelY ^ 2)))
+End Function
+
+Function Vol(ball)
+    Vol = CSng(BallVel(ball) ^ 2 / 2000)
+End Function
+
+Function Pitch(ball)
+    Pitch = BallVel(ball) * 20
+End Function
+
+Sub TTPlayAtBall(soundname)
+    PlaySound soundname, 0, Vol(ActiveBall), AudioPan(ActiveBall), 0, Pitch(ActiveBall), 1, 0, AudioFade(ActiveBall)
+End Sub
+
+' ---------------------------------------------------------------- rolling sounds
+
+Sub RollingTimer_Timer()
+    Dim BOT, b
+    BOT = GetBalls
+    For b = UBound(BOT) + 1 To TTF_MAXBALLS
+        TTF_Rolling(b) = False
+        StopSound "fx_ballrolling" & b
+    Next
+    If UBound(BOT) = -1 Then Exit Sub
+    For b = 0 To UBound(BOT)
+        If b > TTF_MAXBALLS Then Exit For
+        If BallVel(BOT(b)) > 1 And BOT(b).z < 30 Then
+            TTF_Rolling(b) = True
+            PlaySound "fx_ballrolling" & b, -1, Vol(BOT(b)), AudioPan(BOT(b)), 0, Pitch(BOT(b)), 1, 0, AudioFade(BOT(b))
+        ElseIf TTF_Rolling(b) Then
+            StopSound "fx_ballrolling" & b
+            TTF_Rolling(b) = False
+        End If
+        If BOT(b).VelZ < -1 And BOT(b).z < 55 And BOT(b).z > 27 Then
+            PlaySound "fx_ball_drop" & b, 0, Abs(BOT(b).VelZ) / 17, AudioPan(BOT(b)), 0, Pitch(BOT(b)), 1, 0, AudioFade(BOT(b))
+        End If
+    Next
+End Sub
+
+Sub OnBallBallCollision(ball1, ball2, velocity)
+    PlaySound "fx_collide", 0, CSng(velocity) ^ 2 / 2000, AudioPan(ball1), 0, Pitch(ball1), 0, 0, AudioFade(ball1)
+End Sub
+
+' ---------------------------------------------------------------- shadows
+
+Sub LeftFlipper_Animate()
+    On Error Resume Next
+    FlipperLSh.RotZ = LeftFlipper.CurrentAngle
+    On Error GoTo 0
+End Sub
+
+Sub RightFlipper_Animate()
+    On Error Resume Next
+    FlipperRSh.RotZ = RightFlipper.CurrentAngle
+    On Error GoTo 0
+End Sub
+
+Sub BallShadowUpdate_Timer()
+    Dim BOT, b, shadows
+    On Error Resume Next
+    shadows = Array(BallShadow1, BallShadow2, BallShadow3, BallShadow4, BallShadow5)
+    If Err.Number <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Sub
+    End If
+    BOT = GetBalls
+    For b = UBound(BOT) + 1 To TTF_MAXBALLS - 1
+        shadows(b).Visible = 0
+    Next
+    For b = 0 To UBound(BOT)
+        If b >= TTF_MAXBALLS Then Exit For
+        shadows(b).X = BOT(b).X + (BOT(b).X - (Table1.Width / 2)) * 1.25 / TTF_BALLSIZE
+        shadows(b).Y = BOT(b).Y + 12
+        shadows(b).Size_X = 5
+        shadows(b).Size_Y = 5
+        If BOT(b).Z > 20 Then
+            shadows(b).Visible = 1
+        Else
+            shadows(b).Visible = 0
+        End If
+    Next
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' ---------------------------------------------------------------- contact sounds (collections)
+
+Sub Pins_Hit(idx)          : TTPlayAtBall "pinhit_low"      : End Sub
+Sub Targets_Hit(idx)       : TTPlayAtBall "target"          : End Sub
+Sub Metals_Thin_Hit(idx)   : TTPlayAtBall "metalhit_thin"   : End Sub
+Sub Metals_Medium_Hit(idx) : TTPlayAtBall "metalhit_medium" : End Sub
+Sub Metals2_Hit(idx)       : TTPlayAtBall "metalhit2"       : End Sub
+Sub Gates_Hit(idx)         : TTPlayAtBall "gate4"           : End Sub
+
+Sub Rubbers_Hit(idx)
+    TTRubberSound 20
+End Sub
+
+Sub Posts_Hit(idx)
+    TTRubberSound 16
+End Sub
+
+Sub TTRubberSound(hard)
+    Dim speed
+    speed = Sqr(ActiveBall.VelX * ActiveBall.VelX + ActiveBall.VelY * ActiveBall.VelY)
+    If speed > hard Then
+        TTPlayAtBall "fx_rubber2"
+    ElseIf speed >= 6 Then
+        TTPlayAtBall "rubber_hit_" & (Int(Rnd * 3) + 1)
+    End If
+End Sub
+
+Sub LeftFlipper_Collide(parm)
+    TTPlayAtBall "flip_hit_" & (Int(Rnd * 3) + 1)
+End Sub
+
+Sub RightFlipper_Collide(parm)
+    TTPlayAtBall "flip_hit_" & (Int(Rnd * 3) + 1)
+End Sub
+
+' ----------------------------------------------------------------------------
 ' tt_display.vbs
 ' ----------------------------------------------------------------------------
 ' =============================================================================
@@ -1012,7 +1248,7 @@ Const TTD_BOTTOM = 7
 
 Dim FlexDMD, TTD_Ok
 Dim TTD_ColOrange, TTD_ColPink, TTD_ColWhite, TTD_ColGrey, TTD_ColBg
-Dim TTD_FBigO, TTD_FBigW, TTD_FMedO, TTD_FMedW, TTD_FSmallO, TTD_FSmallW, TTD_FSmallP, TTD_FTinyW, TTD_FTinyO, TTD_FTinyG
+Dim TTD_FHeadO, TTD_FBigO, TTD_FBigW, TTD_FMedO, TTD_FMedW, TTD_FSmallO, TTD_FSmallW, TTD_FSmallP, TTD_FTinyW, TTD_FTinyO, TTD_FTinyG
 
 ' Screens (groups)
 Dim TTD_Game, TTD_Call, TTD_Report, TTD_Initials, TTD_Claim, TTD_Attract, TTD_Error
@@ -1023,7 +1259,7 @@ Dim TTD_Pips(6)
 Dim TTD_LastScoreText, TTD_LastInfoText, TTD_LastNextText
 
 ' Callout overlay + queue
-Dim TTD_lblCall1, TTD_lblCall2
+Dim TTD_lblCall1, TTD_lblCall1Px, TTD_lblCall2
 Dim TTD_CallActive, TTD_CallUntil, TTD_CallIsCard
 Dim TTD_Q1(15), TTD_Q2(15), TTD_QMs(15), TTD_QHead, TTD_QCount
 Dim TTD_PendCard1, TTD_PendCard2, TTD_PendCardAt, TTD_HasPendCard
@@ -1079,9 +1315,15 @@ Sub TTDisplayInit()
         .Height = TT_DMD_H
         .Clear = True
     End With
+    On Error Resume Next
+    FlexDMD.ProjectFolder = TT_DMD_ASSETS
+    Err.Clear
+    On Error GoTo 0
 
-    Set TTD_FBigO = FlexDMD.NewFont(TT_FONT_BIG, TTD_ColOrange, TTD_ColBg, 0)
-    Set TTD_FBigW = FlexDMD.NewFont(TT_FONT_BIG, TTD_ColWhite, TTD_ColBg, 0)
+    ' Brand fonts first, pixel fonts if the Comfortaa files aren't installed
+    Set TTD_FBigO = TTDFont(TT_FONT_BRAND_BIG, TT_FONT_BIG, TTD_ColOrange)
+    Set TTD_FBigW = TTDFont(TT_FONT_BRAND_BIG, TT_FONT_BIG, TTD_ColWhite)
+    Set TTD_FHeadO = TTDFont(TT_FONT_BRAND_HEAD, TT_FONT_MED, TTD_ColOrange)
     Set TTD_FMedO = FlexDMD.NewFont(TT_FONT_MED, TTD_ColOrange, TTD_ColBg, 0)
     Set TTD_FMedW = FlexDMD.NewFont(TT_FONT_MED, TTD_ColWhite, TTD_ColBg, 0)
     Set TTD_FSmallO = FlexDMD.NewFont(TT_FONT_SMALL, TTD_ColOrange, TTD_ColBg, 0)
@@ -1111,7 +1353,8 @@ Sub TTDisplayInit()
 
     ' Callout overlay (sits above the game screen)
     Set TTD_Call = TTDGroup("call")
-    Set TTD_lblCall1 = TTDLabel(TTD_Call, "call1", TTD_FMedO, "", TT_DMD_W / 2, 14, TTD_TOP)
+    Set TTD_lblCall1 = TTDLabel(TTD_Call, "call1", TTD_FHeadO, "", TT_DMD_W / 2, 12, TTD_TOP)
+    Set TTD_lblCall1Px = TTDLabel(TTD_Call, "call1px", TTD_FMedO, "", TT_DMD_W / 2, 14, TTD_TOP)
     Set TTD_lblCall2 = TTDLabel(TTD_Call, "call2", TTD_FSmallW, "", TT_DMD_W / 2, 36, TTD_TOP)
 
     ' Board report
@@ -1172,6 +1415,21 @@ Sub TTDisplayExit()
     On Error GoTo 0
 End Sub
 
+' Load a font, falling back to a built-in one if the file is missing.
+Function TTDFont(path, fallback, tint)
+    Dim f
+    Set f = Nothing
+    On Error Resume Next
+    Set f = FlexDMD.NewFont(path, tint, TTD_ColBg, 0)
+    If Err.Number <> 0 Or f Is Nothing Then
+        Err.Clear
+        Set f = FlexDMD.NewFont(fallback, tint, TTD_ColBg, 0)
+    End If
+    Err.Clear
+    On Error GoTo 0
+    Set TTDFont = f
+End Function
+
 Function TTDGroup(name)
     Dim g, bg
     Set g = FlexDMD.NewGroup(name)
@@ -1199,6 +1457,16 @@ Sub TTDSet(lbl, text, x, y, align)
     lbl.Text = text
     lbl.SetAlignedPosition x, y, align
 End Sub
+
+' Rendered width of a label (falls back to an estimate).
+Function TTDWidth(lbl)
+    On Error Resume Next
+    lbl.Pack
+    TTDWidth = lbl.Width
+    If Err.Number <> 0 Then TTDWidth = Len(lbl.Text) * 11
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 Sub TTDSetC(lbl, text, y)
     TTDSet lbl, text, TT_DMD_W / 2, y, TTD_TOP
@@ -1332,7 +1600,13 @@ Sub TTDisplayMessage(line1, line2, ms, nowMs)
 End Sub
 
 Sub TTDShowCallout(line1, line2, ms, nowMs, isCard)
-    TTDSetC TTD_lblCall1, line1, 14
+    ' Headline in Comfortaa; long lines (e.g. technique names) use the pixel font
+    TTDSetC TTD_lblCall1, line1, 12
+    TTDSetC TTD_lblCall1Px, "", 14
+    If TTDWidth(TTD_lblCall1) > TT_DMD_W - 6 Then
+        TTDSetC TTD_lblCall1, "", 12
+        TTDSetC TTD_lblCall1Px, line1, 14
+    End If
     TTDSetC TTD_lblCall2, line2, 36
     TTD_Call.Visible = True
     TTD_CallActive = True
@@ -1742,6 +2016,9 @@ Sub Table1_Init()
 
     TTScoresLoad
     TTDisplayInit
+    TTFeelInit
+    TTCaptiveBallInit
+    TTBackglassStart
     tmrTick.Interval = 33
     tmrTick.Enabled = True
 
@@ -1760,6 +2037,7 @@ End Sub
 Sub Table1_Exit()
     TTScoresSave
     TTDisplayExit
+    TTBackglassStop
 End Sub
 
 ' VPX 10.8 table options menu (operator settings). Ignored on older builds.
@@ -1802,7 +2080,10 @@ End Sub
 ' ---------------------------------------------------------------- keys
 
 Sub Table1_KeyDown(ByVal keycode)
-    If keycode = PlungerKey Then Plunger.PullBack
+    If keycode = PlungerKey Then
+        Plunger.PullBack
+        TTPlay "plunger_pull"
+    End If
     If keycode = LeftTiltKey Then Nudge 90, 2 : TTNudged
     If keycode = RightTiltKey Then Nudge 270, 2 : TTNudged
     If keycode = CenterTiltKey Then Nudge 0, 2 : TTNudged
@@ -1829,9 +2110,18 @@ Sub Table1_KeyDown(ByVal keycode)
 End Sub
 
 Sub Table1_KeyUp(ByVal keycode)
-    If keycode = PlungerKey Then Plunger.Fire
-    If keycode = LeftFlipperKey Then LeftFlipper.RotateToStart
-    If keycode = RightFlipperKey Then RightFlipper.RotateToStart
+    If keycode = PlungerKey Then
+        Plunger.Fire
+        TTPlay "plunger"
+    End If
+    If keycode = LeftFlipperKey Then
+        If LeftFlipper.CurrentAngle <> LeftFlipper.StartAngle Then TTPlay "flipper_down"
+        LeftFlipper.RotateToStart
+    End If
+    If keycode = RightFlipperKey Then
+        If RightFlipper.CurrentAngle <> RightFlipper.StartAngle Then TTPlay "flipper_down"
+        RightFlipper.RotateToStart
+    End If
 End Sub
 
 Function TTFlippersLive()
@@ -1895,6 +2185,42 @@ Function TTActiveBallId()
     On Error GoTo 0
 End Function
 
+' B2S backglass (ThreatTide.directb2s next to the .vpx). Original tables start
+' the B2S server themselves; if it isn't installed the table runs without it.
+Dim TTB2S
+Sub TTBackglassStart()
+    Set TTB2S = Nothing
+    If Not TT_UseB2S Then Exit Sub
+    On Error Resume Next
+    Set TTB2S = CreateObject("B2S.Server")
+    If Err.Number <> 0 Then
+        Set TTB2S = Nothing
+    Else
+        TTB2S.B2SName = "ThreatTide"
+        TTB2S.Run
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Sub TTBackglassStop()
+    On Error Resume Next
+    If Not TTB2S Is Nothing Then TTB2S.Stop
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' The captive SCADA / OT ball is created once by the kAirGapCaptive kicker,
+' which then lets go of it and switches off so it can't catch it again.
+Sub TTCaptiveBallInit()
+    Dim k
+    Set k = TTObj("kAirGapCaptive")
+    If k Is Nothing Then Exit Sub
+    k.CreateBall
+    k.Kick 180, 1
+    k.Enabled = False
+End Sub
+
 ' Phase 2: captive SCADA / OT ball behind the Air Gap gate
 Sub swAirGap_Hit()
     If TTMode = "game" Then TTG.AirGapHit GameTime
@@ -1929,12 +2255,12 @@ Sub TTResetAssets()
 End Sub
 
 Sub LeftSlingshot_Slingshot()
-    TTPlay "sling"
+    TTFeelSling False
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 
 Sub RightSlingshot_Slingshot()
-    TTPlay "sling"
+    TTFeelSling True
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 

@@ -4,20 +4,28 @@ You are building the playfield for an original Visual Pinball X 10.8 table that 
 
 Read first: the design spec (from CyQuantiFi), then [`object-contract.md`](object-contract.md).
 
-## What you build
+## What's already built
 
-1. **Playfield geometry** in the VPX editor: walls, ramps, orbits, saucers, slings, flippers, plunger lane, drain, drop targets. Seven stage shots fanning left to right; Lateral Movement feeding the left flipper. Plus the Air Gap gate and captive ball, lock inserts and a centre ramp (see the object contract). The script for all three phases is written, so build everything in one pass.
-2. **Object names** exactly as in the object contract.
-3. **Lights and inserts**: 7 orange stage inserts, pink Air Gap insert, white asset targets.
-4. **Art placement**: playfield and backglass art from `art/` (SVG sources, brand palette, Comfortaa). Finish the art at print resolution; keep layered source files.
-5. **B2S backglass** (`.directb2s`) from `art/backglass.svg`. Static image is fine for Phase 1.
-6. **Music**: copy the background track to `<VPX folder>\Music\ThreatTide\theme.mp3` (CyQuantiFi supplies the file; it isn't in this repo for licence reasons). It loops during play. Track names are set in `tt_config.vbs` (`TT_MusicTheme`, `TT_MusicSurge`).
-7. **Sounds** imported into the Sound Manager using the names in `table/tt_sound.vbs` (e.g. `vo_path_complete`, `sfx_edr`). Original or royalty-free only. Missing sounds are skipped, so this can come last.
-8. **Image `qr_form`** in the Image Manager: the QR code for the booth form (CyQuantiFi supplies it).
+`dist/ThreatTide.vpx` (from CI, or `bash tools/build_all.sh`) is a complete, scripted table built on the VPX blank table:
+
+- All seven stage shots, the Air Gap channel (drop gate, captive ball on posts, switch), the Impact scoop/lock, asset drop targets, orbits and every insert light, laid out in [`tools/table_layout.py`](../tools/table_layout.py).
+- Playfield art generated from the same layout, so inserts and labels line up; the backglass (`ThreatTide.directb2s`); Comfortaa DMD fonts; game-cue sound effects.
+- The full script for all three phases, plus the blank table's ball shadows, rolling sounds and sling animations.
+
+It has not been played yet: it was built on Linux, where VPX can't run.
+
+## What you do
+
+1. **Play it and fix the flow.** Shot angles, lane widths, kicker eject angles and forces, the captive ball's travel, and the Impact scoop are first guesses. Change geometry in `tools/table_layout.py` and rebuild, or adjust in the VPX editor and port the numbers back so the repo stays the source of truth. Kicker values live in the **Geometry** block of `table/tt_config.vbs`.
+2. **Lateral Movement → left flipper.** It's the right orbit: the ball goes round the top and down the left orbit to the left inlane. Check that it reliably reaches the left flipper; a habitrail or ramp would do it better.
+3. **Art polish.** Finish `art/playfield_table.svg` and `art/backglass.svg` at print quality (keep the layered sources), and replace the blank table's generic apron art.
+4. **Voice callouts** (`vo_*` in `table/tt_sound.vbs`). Original or royalty-free only. Missing sounds are skipped.
+5. **Music**: `<VPX folder>\Music\ThreatTide\theme.mp3` (CyQuantiFi supplies the file; it isn't in this repo for licence reasons).
+6. **QR code**: set `TT_FormUrl` in `tt_config.vbs` to the real form URL and run `python3 tools/make_qr.py`.
 
 ## Loading the script
 
-- **Cabinet / release:** run `python3 tools/bundle.py` (or take the committed `dist/ThreatTide_full.vbs`) and paste the whole file into the table's script editor.
+- **Cabinet / release:** the built `.vpx` already contains the script. To update only the script, paste `dist/ThreatTide_full.vbs` into the table's script editor.
 - **While iterating:** paste `table/ThreatTide_loader.vbs` instead and copy `table/*.vbs` into VPX's `Scripts` folder. Edits to the module files apply on the next table start. If your VPX build does not fire events from loaded files, use the bundle.
 
 Do not edit game rules inside the .vpx. Change the files in `table/` and rebuild, so the repo stays the source of truth. Physical values you will tune (kicker angles and forces, saucer hold) are in the **Geometry** section at the bottom of `table/tt_config.vbs`.
@@ -30,7 +38,7 @@ Do not edit game rules inside the .vpx. Change the files in `table/` and rebuild
 
 ## Deliverables
 
-- `.vpx` table file, `.directb2s` backglass, any FlexDMD assets (e.g. Comfortaa BMFont files if you make them).
+- Layout and config changes committed back to this repo, so `tools/build_all.sh` reproduces your table.
 - Source files for playfield and backglass art (layered SVG/PSD/AI), so CyQuantiFi owns and can edit them.
 - A completed `docs/LICENSES.md` row for every art, font and sound asset you add.
 

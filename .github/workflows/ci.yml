@@ -27,3 +27,36 @@ jobs:
         working-directory: tests
         shell: cmd
         run: cscript //nologo run_tests.wsf
+
+  table:
+    # Builds the playable table from the VPX blank table + this repo, and
+    # uploads it (with the backglass and DMD fonts) as a downloadable artifact.
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python packages
+        run: pip install pillow numpy
+      - name: Cache vpxtool
+        id: vpxtool
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/vpxtool
+          key: vpxtool-0.38.0-${{ runner.os }}
+      - name: Install vpxtool
+        if: steps.vpxtool.outputs.cache-hit != 'true'
+        run: cargo install vpxtool --version 0.38.0 --locked
+      - name: Build table (art PNGs are the committed renders)
+        run: SKIP_ART=1 bash tools/build_all.sh
+      - name: Table audit
+        run: ~/.cargo/bin/vpxtool audit dist/ThreatTide.vpx | tail -3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ThreatTide-table
+          path: |
+            dist/ThreatTide.vpx
+            dist/ThreatTide.directb2s
+            dmd/

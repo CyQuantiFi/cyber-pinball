@@ -31,6 +31,16 @@ Add a collection notice above the submit button (see Privacy below) and a link t
 - Written terms displayed at the booth and linked from the form.
 - Scores are game-design numbers for fun, not real loss estimates.
 
+## Installing on the cabinet
+
+Needs Visual Pinball X 10.8, FlexDMD and the B2S Backglass Server installed (standard on a virtual pinball cabinet).
+
+1. Download the **ThreatTide-table** artifact from the latest green CI run (Actions tab), or run `bash tools/build_all.sh`.
+2. Copy `ThreatTide.vpx` and `ThreatTide.directb2s` into VPX's `Tables` folder, side by side.
+3. Copy the repo's `dmd\` folder to `Tables\ThreatTide\` (the Comfortaa DMD fonts). Without it the DMD uses pixel fonts.
+4. Copy the music (below).
+5. Launch the table. If any objects are missing, the DMD lists them for 20 seconds.
+
 ## Music (one-time cabinet setup)
 
 Copy the background track (Pixabay `atlasaudio-cyberpunk-music-617559.mp3`, kept with CyQuantiFi's event files, not in the repo) to:

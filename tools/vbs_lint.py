@@ -149,7 +149,7 @@ def main(argv):
         # Each group shares one global namespace, as it does at run time.
         t = ROOT / "table"
         cabinet = [t / f"{m}.vbs" for m in ("tt_config", "tt_money", "tt_rules", "tt_sound",
-                                            "tt_display", "tt_scores", "tt_table")]
+                                            "tt_feel", "tt_display", "tt_scores", "tt_table")]
         tests = [t / f"{m}.vbs" for m in ("tt_config", "tt_money", "tt_rules", "tt_scores")]
         tests += sorted((ROOT / "tests").glob("*.vbs"))
         groups = [cabinet, tests, [t / "ThreatTide_loader.vbs"]]

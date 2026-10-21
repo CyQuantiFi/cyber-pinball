@@ -16,7 +16,7 @@ Const TTD_BOTTOM = 7
 
 Dim FlexDMD, TTD_Ok
 Dim TTD_ColOrange, TTD_ColPink, TTD_ColWhite, TTD_ColGrey, TTD_ColBg
-Dim TTD_FBigO, TTD_FBigW, TTD_FMedO, TTD_FMedW, TTD_FSmallO, TTD_FSmallW, TTD_FSmallP, TTD_FTinyW, TTD_FTinyO, TTD_FTinyG
+Dim TTD_FHeadO, TTD_FBigO, TTD_FBigW, TTD_FMedO, TTD_FMedW, TTD_FSmallO, TTD_FSmallW, TTD_FSmallP, TTD_FTinyW, TTD_FTinyO, TTD_FTinyG
 
 ' Screens (groups)
 Dim TTD_Game, TTD_Call, TTD_Report, TTD_Initials, TTD_Claim, TTD_Attract, TTD_Error
@@ -27,7 +27,7 @@ Dim TTD_Pips(6)
 Dim TTD_LastScoreText, TTD_LastInfoText, TTD_LastNextText
 
 ' Callout overlay + queue
-Dim TTD_lblCall1, TTD_lblCall2
+Dim TTD_lblCall1, TTD_lblCall1Px, TTD_lblCall2
 Dim TTD_CallActive, TTD_CallUntil, TTD_CallIsCard
 Dim TTD_Q1(15), TTD_Q2(15), TTD_QMs(15), TTD_QHead, TTD_QCount
 Dim TTD_PendCard1, TTD_PendCard2, TTD_PendCardAt, TTD_HasPendCard
@@ -83,9 +83,15 @@ Sub TTDisplayInit()
         .Height = TT_DMD_H
         .Clear = True
     End With
+    On Error Resume Next
+    FlexDMD.ProjectFolder = TT_DMD_ASSETS
+    Err.Clear
+    On Error GoTo 0
 
-    Set TTD_FBigO = FlexDMD.NewFont(TT_FONT_BIG, TTD_ColOrange, TTD_ColBg, 0)
-    Set TTD_FBigW = FlexDMD.NewFont(TT_FONT_BIG, TTD_ColWhite, TTD_ColBg, 0)
+    ' Brand fonts first, pixel fonts if the Comfortaa files aren't installed
+    Set TTD_FBigO = TTDFont(TT_FONT_BRAND_BIG, TT_FONT_BIG, TTD_ColOrange)
+    Set TTD_FBigW = TTDFont(TT_FONT_BRAND_BIG, TT_FONT_BIG, TTD_ColWhite)
+    Set TTD_FHeadO = TTDFont(TT_FONT_BRAND_HEAD, TT_FONT_MED, TTD_ColOrange)
     Set TTD_FMedO = FlexDMD.NewFont(TT_FONT_MED, TTD_ColOrange, TTD_ColBg, 0)
     Set TTD_FMedW = FlexDMD.NewFont(TT_FONT_MED, TTD_ColWhite, TTD_ColBg, 0)
     Set TTD_FSmallO = FlexDMD.NewFont(TT_FONT_SMALL, TTD_ColOrange, TTD_ColBg, 0)
@@ -115,7 +121,8 @@ Sub TTDisplayInit()
 
     ' Callout overlay (sits above the game screen)
     Set TTD_Call = TTDGroup("call")
-    Set TTD_lblCall1 = TTDLabel(TTD_Call, "call1", TTD_FMedO, "", TT_DMD_W / 2, 14, TTD_TOP)
+    Set TTD_lblCall1 = TTDLabel(TTD_Call, "call1", TTD_FHeadO, "", TT_DMD_W / 2, 12, TTD_TOP)
+    Set TTD_lblCall1Px = TTDLabel(TTD_Call, "call1px", TTD_FMedO, "", TT_DMD_W / 2, 14, TTD_TOP)
     Set TTD_lblCall2 = TTDLabel(TTD_Call, "call2", TTD_FSmallW, "", TT_DMD_W / 2, 36, TTD_TOP)
 
     ' Board report
@@ -176,6 +183,21 @@ Sub TTDisplayExit()
     On Error GoTo 0
 End Sub
 
+' Load a font, falling back to a built-in one if the file is missing.
+Function TTDFont(path, fallback, tint)
+    Dim f
+    Set f = Nothing
+    On Error Resume Next
+    Set f = FlexDMD.NewFont(path, tint, TTD_ColBg, 0)
+    If Err.Number <> 0 Or f Is Nothing Then
+        Err.Clear
+        Set f = FlexDMD.NewFont(fallback, tint, TTD_ColBg, 0)
+    End If
+    Err.Clear
+    On Error GoTo 0
+    Set TTDFont = f
+End Function
+
 Function TTDGroup(name)
     Dim g, bg
     Set g = FlexDMD.NewGroup(name)
@@ -203,6 +225,16 @@ Sub TTDSet(lbl, text, x, y, align)
     lbl.Text = text
     lbl.SetAlignedPosition x, y, align
 End Sub
+
+' Rendered width of a label (falls back to an estimate).
+Function TTDWidth(lbl)
+    On Error Resume Next
+    lbl.Pack
+    TTDWidth = lbl.Width
+    If Err.Number <> 0 Then TTDWidth = Len(lbl.Text) * 11
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 Sub TTDSetC(lbl, text, y)
     TTDSet lbl, text, TT_DMD_W / 2, y, TTD_TOP
@@ -336,7 +368,13 @@ Sub TTDisplayMessage(line1, line2, ms, nowMs)
 End Sub
 
 Sub TTDShowCallout(line1, line2, ms, nowMs, isCard)
-    TTDSetC TTD_lblCall1, line1, 14
+    ' Headline in Comfortaa; long lines (e.g. technique names) use the pixel font
+    TTDSetC TTD_lblCall1, line1, 12
+    TTDSetC TTD_lblCall1Px, "", 14
+    If TTDWidth(TTD_lblCall1) > TT_DMD_W - 6 Then
+        TTDSetC TTD_lblCall1, "", 12
+        TTDSetC TTD_lblCall1Px, line1, 14
+    End If
     TTDSetC TTD_lblCall2, line2, 36
     TTD_Call.Visible = True
     TTD_CallActive = True

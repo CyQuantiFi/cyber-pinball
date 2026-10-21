@@ -98,6 +98,7 @@ Dim TT_PatchTuesdayOn : TT_PatchTuesdayOn = True
 Dim TT_VolumePreset : TT_VolumePreset = "booth"   ' "booth" (loud hall) or "quiet"
 Dim TT_ContestMode : TT_ContestMode = True        ' High scores reset each day
 Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
+Dim TT_UseB2S : TT_UseB2S = True                  ' Show ThreatTide.directb2s on the backglass screen
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
 ' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----
@@ -107,7 +108,12 @@ Dim TT_MusicSurge : TT_MusicSurge = ""            ' Storm Surge track; "" keeps 
 ' ---- Display -----------------------------------------------------------------
 Const TT_DMD_W = 256
 Const TT_DMD_H = 64
-' FlexDMD fonts. Swap for Comfortaa BMFont files when the art pack is ready.
+' FlexDMD assets folder, relative to the .vpx (copy the repo's dmd\ folder here)
+Const TT_DMD_ASSETS = "./ThreatTide/"
+' Brand fonts (Comfortaa BMFonts from tools/make_dmd_fonts.py). If they're
+' missing, the built-in pixel fonts below are used instead.
+Const TT_FONT_BRAND_BIG = "comfortaa_bold_24.fnt"
+Const TT_FONT_BRAND_HEAD = "comfortaa_bold_14.fnt"
 Const TT_FONT_BIG = "FlexDMD.Resources.udmd-f12by24.fnt"
 Const TT_FONT_MED = "FlexDMD.Resources.udmd-f6by12.fnt"
 Const TT_FONT_SMALL = "FlexDMD.Resources.udmd-f5by7.fnt"
@@ -118,8 +124,8 @@ Const TT_QR_IMAGE = "VPX.qr_form"   ' Image named qr_form in the table's image m
 ' Kicker eject: angle in degrees (0 = up), force.
 Const TT_KICK_PERSISTENCE_ANGLE = 180
 Const TT_KICK_PERSISTENCE_FORCE = 12
-Const TT_KICK_IMPACT_ANGLE = 200
-Const TT_KICK_IMPACT_FORCE = 14
+Const TT_KICK_IMPACT_ANGLE = 214
+Const TT_KICK_IMPACT_FORCE = 10
 Const TT_RELEASE_ANGLE = 90
 Const TT_RELEASE_FORCE = 7
 Const TT_SAUCER_HOLD_MS = 900

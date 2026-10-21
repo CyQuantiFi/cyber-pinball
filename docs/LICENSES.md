@@ -1,11 +1,16 @@
 # Asset licences
 
+> **Check before the first show: Visual Pinball X licence.** VPX has been moving to GPLv3+ since 2020, but files without a GPL marker are still under its older licence, which says redistributions "may not be sold, nor may they be used in a commercial product or activity". A booth used for marketing could count as commercial activity, both for running VPX and for the blank-table parts inside `ThreatTide.vpx`. Get a view from legal, or ask the VPX team (github.com/vpinball/vpinball), before the first show.
+
 Every font, image, sound and music file in the table, backglass or display must have a row here before it goes to a show. Original table only: no third-party characters, logos or licensed music.
 
 | Asset | Used in | Source / author | Licence | Notes |
 | --- | --- | --- | --- | --- |
-| Comfortaa (font) | Playfield, backglass, art sources | Johan Aakerlund, Google Fonts | SIL Open Font License 1.1 | Free to embed and convert to BMFont for FlexDMD. |
-| FlexDMD built-in fonts (`udmd-*.fnt`) | DMD | FlexDMD (vbousquet) | Bundled with FlexDMD | Placeholder until Comfortaa BMFonts exist. |
+| Comfortaa (font), `art/fonts/` | Playfield, backglass, DMD (`dmd/*.fnt`), leaderboard | The Comfortaa Project Authors, from google/fonts | SIL Open Font License 1.1 (`art/fonts/OFL.txt`) | Embedding and bitmap conversion allowed; keep OFL.txt with the font. |
+| FlexDMD built-in fonts (`udmd-*.fnt`) | DMD small text | FlexDMD (vbousquet) | Bundled with FlexDMD | |
+| VPX blank table (`blankTable.vpx`) | Base of `ThreatTide.vpx`: cabinet, apron, flippers, slings, plunger lane, stock images and mechanical sounds | Visual Pinball X team | VPX licence (see below) | Downloaded at build time, not stored in this repo. |
+| Game-cue sound effects (`sound/sfx/*.wav`) | Game | Synthesized by `tools/make_sfx.py` | Owned by CyQuantiFi | Original, generated from code. |
+| Table-feel script (`table/tt_feel.vbs`) | Ball shadows, rolling sounds, sling animation | Adapted from the VPX blank table script (fuzzel, jimmyfingers, jpsalas, toxie, unclewilly, ninuzzu, rothbauerw) | VPX licence | Credited in the file header. |
 | `art/playfield.svg`, `art/backglass.svg`, `art/icons/*`, `art/inserts/*` | Art sources | CyQuantiFi (made for this table) | Owned by CyQuantiFi | |
 | MITRE ATT&CK technique names and IDs | Display, report, backglass | The MITRE Corporation | ATT&CK Terms of Use (attribution required) | Attribution on backglass and attract mode. |
 | CyQuantiFi wordmark | Backglass | CyQuantiFi | Owned | |
