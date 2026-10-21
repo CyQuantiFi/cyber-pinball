@@ -9,7 +9,7 @@ All dollar values are game-design numbers for fun. They are not CyQuantiFi model
 | Path | What |
 | --- | --- |
 | `table/tt_config.vbs` | **All tuning values and the technique decks, in one block.** Start here to change the game. |
-| `table/tt_rules.vbs` | Game rules (chain, Paths, multiplier, combos, defences). No VPX objects, so it's unit-tested. |
+| `table/tt_rules.vbs` | Game rules (chain, Paths, multiplier, combos, defences, Expert Consensus, Air Gap, Storm Surge). No VPX objects, so it's unit-tested. |
 | `table/tt_table.vbs` | VPX glue: switches, lights, keys, ball handling, game flow. |
 | `table/tt_display.vbs` | FlexDMD: $ score, chain pips, card callouts, board report, initials, attract. |
 | `table/tt_scores.vbs` | High scores (contest-mode daily reset) and the JSON game log. |
@@ -18,6 +18,7 @@ All dollar values are game-design numbers for fun. They are not CyQuantiFi model
 | `tests/` | Rules tests, run with Windows `cscript` in CI. |
 | `tools/` | Bundler, VBScript lint, tuning simulator. |
 | `art/` | Editable SVG sources: playfield, backglass, inserts, asset icons. |
+| `leaderboard/` | Live leaderboard page for the booth's second screen. Runs from disk, no server or internet. |
 | `docs/` | Object contract, author brief, tuning guide, acceptance tests, booth runbook, licences. |
 
 The `.vpx` table file itself (playfield geometry) is built in the VPX editor by a table author against [`docs/object-contract.md`](docs/object-contract.md). See [`docs/author-brief.md`](docs/author-brief.md).
@@ -36,8 +37,10 @@ On Windows: `cd tests && cscript //nologo run_tests.wsf`. CI runs all of these o
 
 | Phase | Scope | Status |
 | --- | --- | --- |
-| 1 — Booth MVP | 7 stage shots, technique cards, $ scoring, Paths, defences, board report, initials, high scores + JSON log | Script done; table geometry and art finish with the author |
-| 2 — Modes | Expert Consensus multiball (3-ball lock), Air Gap captive ball | Values in config; geometry in the object contract |
-| 3 — Wizard and leaderboard | Storm Surge, live leaderboard page reading the JSON files, contest mode | Contest mode and JSON output done; rest to build |
+| 1 — Booth MVP | 7 stage shots, technique cards, $ scoring, Paths, defences, board report, initials, high scores + JSON log | Script done |
+| 2 — Modes | Expert Consensus multiball (3-ball virtual lock at Impact), Air Gap captive ball | Script done |
+| 3 — Wizard and leaderboard | Storm Surge, live leaderboard page, contest mode | Script and page done |
+
+All three phases still need the table author's geometry, art and sound, then cabinet playtesting against [`docs/acceptance.md`](docs/acceptance.md).
 
 Open questions from the spec: cabinet (buy, build or hire), author budget and deadline, first target show, daily prize.

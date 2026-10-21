@@ -31,10 +31,21 @@ Add a collection notice above the submit button (see Privacy below) and a link t
 - Written terms displayed at the booth and linked from the form.
 - Scores are game-design numbers for fun, not real loss estimates.
 
+## Leaderboard screen (second monitor)
+
+One-time setup on the cabinet PC:
+1. Set `TT_DataDir` in `table/tt_config.vbs` to a fixed folder, e.g. `C:\ThreatTide\data\`, and rebuild the bundle.
+2. Copy the `leaderboard/` folder to the cabinet (e.g. `C:\ThreatTide\leaderboard\`).
+3. Edit the top of `start_leaderboard.bat`: `DATA_DIR` (same folder as step 1) and `SCREEN_POS` (where the second monitor starts).
+4. Double-click `start_leaderboard.bat`. It opens Chrome or Edge full screen. Alt+F4 closes it.
+
+The page works offline. It checks for new scores every 3 seconds and highlights the newest entry. Preview it anywhere with `index.html?data=sample_data.js`.
+
 ## Daily routine
 
 **Open**
 - Power on, launch the table, confirm attract mode and today's empty high-score table (contest mode resets at midnight).
+- Start the leaderboard screen; it shows "No losses yet today".
 - Volume preset "Booth" for loud halls; "Quiet" for small rooms (F12 menu).
 - Check the tablet is logged in to the form.
 

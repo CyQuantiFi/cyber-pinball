@@ -79,6 +79,8 @@ Sub Test_MultiplierCapAndDrainReset()
     Dim g, i, r : Set g = NewGame()
     For i = 0 To 5
         PlayPath g, 20000 + i * 10000
+        ' The 3rd Path starts Storm Surge (chain frozen); end it with the ramp
+        If g.SurgeActive Then g.CentreRampHit 20000 + i * 10000 + 7000
     Next
     AssertEq g.PathMult, 6, "capped at 6"
     AssertEq g.PathsCompleted, 6, "six Paths"

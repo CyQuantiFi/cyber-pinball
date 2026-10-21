@@ -1,4 +1,4 @@
-# Table author brief — Threat Tide (Phase 1)
+# Table author brief — Threat Tide
 
 You are building the playfield for an original Visual Pinball X 10.8 table that runs on a 3-screen virtual pinball cabinet at CyQuantiFi exhibition booths. The game rules, display, high scores and sound mapping are already written in this repo. Your job is the table itself.
 
@@ -6,7 +6,7 @@ Read first: the design spec (from CyQuantiFi), then [`object-contract.md`](objec
 
 ## What you build
 
-1. **Playfield geometry** in the VPX editor: walls, ramps, orbits, saucers, slings, flippers, plunger lane, drain, drop targets. Seven stage shots fanning left to right; Lateral Movement feeding the left flipper. Include the Phase 2/3 geometry listed in the object contract (lock, Air Gap gate + captive ball, centre ramp).
+1. **Playfield geometry** in the VPX editor: walls, ramps, orbits, saucers, slings, flippers, plunger lane, drain, drop targets. Seven stage shots fanning left to right; Lateral Movement feeding the left flipper. Plus the Air Gap gate and captive ball, lock inserts and a centre ramp (see the object contract). The script for all three phases is written, so build everything in one pass.
 2. **Object names** exactly as in the object contract.
 3. **Lights and inserts**: 7 orange stage inserts, pink Air Gap insert, white asset targets.
 4. **Art placement**: playfield and backglass art from `art/` (SVG sources, brand palette, Comfortaa). Finish the art at print resolution; keep layered source files.
@@ -33,9 +33,9 @@ Do not edit game rules inside the .vpx. Change the files in `table/` and rebuild
 - Source files for playfield and backglass art (layered SVG/PSD/AI), so CyQuantiFi owns and can edit them.
 - A completed `docs/LICENSES.md` row for every art, font and sound asset you add.
 
-## Done for Phase 1 when
+## Done when
 
-The checklist in [`acceptance.md`](acceptance.md) passes on the cabinet.
+The checklist in [`acceptance.md`](acceptance.md) passes on the cabinet. Phase 1 alone is enough for a first show; the Phase 2 and 3 checks can follow.
 
 ## Constraints
 

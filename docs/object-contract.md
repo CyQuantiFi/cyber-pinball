@@ -1,10 +1,10 @@
 # Object contract
 
-The table script finds playfield objects by name. Build the geometry however plays best, but give each object the name below. On table start the script checks every **Phase 1** name and, if any are missing, lists them on the DMD for 20 seconds.
+The table script finds playfield objects by name. Build the geometry however plays best, but give each object the name below. On table start the script checks every required name and, if any are missing, lists them on the DMD for 20 seconds.
 
 The table object itself must be named **`Table1`**.
 
-## Phase 1 (required now)
+## Phase 1
 
 ### Core
 
@@ -54,19 +54,24 @@ Light states the script sets: `0` off, `1` collected, `2` blinking = shoot this 
 | `liShootAgain` | Light | Extra ball pending |
 | `liBallSave` | Light | IR retainer active |
 
-## Phase 2 and 3 (build the geometry now, script comes later)
+## Phase 2: Expert Consensus and Air Gap
 
-Build these into the first layout so the table is only laid out once. The Phase 1 script ignores them.
+| Name | VPX type | Notes |
+| --- | --- | --- |
+| `kImpact` | Kicker | Same Impact scoop: it is also the lock. Locks are virtual: a locked ball is removed and a new one served to the plunger. When multiball starts, the held ball is kicked out and two more are created in `kImpact` and kicked out 1.5 s apart, so check the eject clears the next ball. |
+| `liLock1`, `liLock2`, `liLock3` | Light | Lock inserts: blinking = lit, solid = locked. |
+| `AirGapGate` | **Wall** | Pink gate in front of the captive ball. The script drops it (`IsDropped = True`) to open during multiball and raises it to close. |
+| `liAirGap` | Light | Pink Air Gap insert: blinks while open, solid once breached. |
+| `swAirGap` | Trigger or target | Hit by the captive SCADA / OT ball when the player shoots it. |
+| *(captive ball)* | Kicker + ball, or walls | The unscannable asset behind the gate. Not referenced by the script; place it so a direct hit drives it into `swAirGap`. |
 
-| Name | VPX type | Phase | Notes |
-| --- | --- | --- | --- |
-| `kImpactLock` *(or reuse `kImpact`)* | Kicker | 2 | Impact lock: holds balls for Expert Consensus multiball. |
-| `liLock1`, `liLock2`, `liLock3` | Light | 2 | Locked-ball inserts. |
-| `AirGapGate` | Gate or diverter wall | 2 | Pink gate, closed except during multiball. |
-| `liAirGap` | Light | 2 | Pink Air Gap insert. |
-| `swAirGap` | Trigger / target | 2 | Behind the gate: hit by the captive SCADA / OT ball. |
-| `CaptiveAirGap` | Captive ball setup (kicker + ball) | 2 | The unscannable asset. |
-| `swCentreRamp` | Trigger | 3 | Centre ramp: Storm Surge final shot. |
+Multiball needs at least 3 balls on the table at once; VPX creates them on demand, so there is no physical trough to size.
+
+## Phase 3: Storm Surge
+
+| Name | VPX type | Notes |
+| --- | --- | --- |
+| `swCentreRamp` | Trigger | Centre ramp exit. Collects the Storm Surge tail jackpot. Make it a clear, satisfying shot from either flipper. |
 
 ## Physics
 

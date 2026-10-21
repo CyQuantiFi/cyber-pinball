@@ -48,10 +48,28 @@ Run these on the booth cabinet (or an identical setup). Tick each box and note t
 - [ ] Runs a full day unattended in attract mode without crashing (leave it 8+ hours).
 - [ ] No third-party IP in art, sound or layout; every asset listed in `docs/LICENSES.md`.
 
-## Phase 2 — Modes (later)
+## Phase 2 — Modes
 
+- [ ] Dropping all 3 asset targets shows "LOCK IS LIT"; a lock insert blinks; the DMD's next line adds "LOCK LIT".
+- [ ] Shooting Impact with a lock lit shows "EXPERT 1 LOCKED"; the ball disappears and a new one is served. Same for lock 2.
+- [ ] Lock 3 starts "EXPERT CONSENSUS": the held ball ejects, two more follow, the pink Air Gap insert blinks and the gate drops.
+- [ ] Two different balls through the same shot inside 4 s: "AGREEMENT" with the jackpot; the jackpot on the info line rises $250K.
+- [ ] Hits on different shots lower the jackpot on the info line.
+- [ ] Shooting the captive ball: "AIR GAP BREACHED $X / QUANTIFIED THE ASSET YOU CAN'T SCAN" for jackpot × 3; the gate closes; a second hit pays nothing.
+- [ ] Draining to one ball: "CONSENSUS CLOSED / AIR GAP SEALED", gate up, play continues on the same ball.
+- [ ] A drain in the first 10 s of multiball is saved.
+- [ ] Board report shows "AIR GAP BREACHED" when it was collected.
+- [ ] Multiball eject: no ball collisions or stuck balls at the Impact scoop over 20 multiballs.
 - [ ] Air Gap is reached in about 1 in 5 games by average players.
 
-## Phase 3 — Wizard and leaderboard (later)
+## Phase 3 — Wizard and leaderboard
 
-- [ ] Leaderboard updates within 10 s of initials entry.
+- [ ] Third Path of a game starts "STORM SURGE": all stage inserts blink, info line shows seconds left, weather multiplier and peak.
+- [ ] Weather multiplier changes every 5 s ("SHARED WEATHER X…").
+- [ ] Centre ramp during the storm: "TAIL JACKPOT $X"; the mode ends.
+- [ ] Timer running out: "STORM PASSED / TAIL JACKPOT MISSED".
+- [ ] Storm Surge happens at most once per game.
+- [ ] `leaderboard/start_leaderboard.bat` opens the board full screen on the second monitor, with no internet connection.
+- [ ] Leaderboard updates within 10 s of initials entry (it checks every 3 s).
+- [ ] The new entry is highlighted and the "Latest attack" panel shows the costliest Path with technique names.
+- [ ] After midnight with contest mode on, the board shows "No losses yet today" until the first game.
