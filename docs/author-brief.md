@@ -11,8 +11,9 @@ Read first: the design spec (from CyQuantiFi), then [`object-contract.md`](objec
 3. **Lights and inserts**: 7 orange stage inserts, pink Air Gap insert, white asset targets.
 4. **Art placement**: playfield and backglass art from `art/` (SVG sources, brand palette, Comfortaa). Finish the art at print resolution; keep layered source files.
 5. **B2S backglass** (`.directb2s`) from `art/backglass.svg`. Static image is fine for Phase 1.
-6. **Sounds** imported into the Sound Manager using the names in `table/tt_sound.vbs` (e.g. `vo_path_complete`, `sfx_edr`). Original or royalty-free only. Missing sounds are skipped, so this can come last.
-7. **Image `qr_form`** in the Image Manager: the QR code for the booth form (CyQuantiFi supplies it).
+6. **Music**: copy the background track to `<VPX folder>\Music\ThreatTide\theme.mp3` (CyQuantiFi supplies the file; it isn't in this repo for licence reasons). It loops during play. Track names are set in `tt_config.vbs` (`TT_MusicTheme`, `TT_MusicSurge`).
+7. **Sounds** imported into the Sound Manager using the names in `table/tt_sound.vbs` (e.g. `vo_path_complete`, `sfx_edr`). Original or royalty-free only. Missing sounds are skipped, so this can come last.
+8. **Image `qr_form`** in the Image Manager: the QR code for the booth form (CyQuantiFi supplies it).
 
 ## Loading the script
 

@@ -65,6 +65,10 @@ Sub Table1_Init()
     End If
 End Sub
 
+Sub Table1_MusicDone()
+    TTMusicLoop
+End Sub
+
 Sub Table1_Exit()
     TTScoresSave
     TTDisplayExit
@@ -341,7 +345,7 @@ Sub TTEmit(kind, a, b)
         Case "surge_start"
             TTDisplayMessage "STORM SURGE", "45 SEC - CENTRE RAMP FOR TAIL JACKPOT", 2500, t
             TTPlay "storm_surge"
-            TTMusic "surge.mp3"
+            If TT_MusicSurge <> "" Then TTMusic TT_MusicSurge
         Case "surge_swing"
             TTDisplayMessage "SHARED WEATHER X" & a, "PEAK X" & b, 1000, t
         Case "surge_tail"
@@ -349,7 +353,7 @@ Sub TTEmit(kind, a, b)
             TTPlay "jackpot"
         Case "surge_end"
             If Not a Then TTDisplayMessage "STORM PASSED", "TAIL JACKPOT MISSED", TT_MSG_SHOW_MS, t
-            TTMusic "theme.mp3"
+            TTMusic TT_MusicTheme
         Case "gameover"
             TTMode = "gameover_wait"
             TTPlay "gameover"
@@ -364,7 +368,7 @@ Sub TTStartGame()
     TTResetAssets
     TTMode = "game"
     TTDisplayStartGame
-    TTMusic "theme.mp3"
+    TTMusic TT_MusicTheme
     TTG.StartGame GameTime
 End Sub
 

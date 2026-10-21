@@ -100,6 +100,10 @@ Dim TT_ContestMode : TT_ContestMode = True        ' High scores reset each day
 Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
+' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----
+Dim TT_MusicTheme : TT_MusicTheme = "theme.mp3"   ' Loops during play
+Dim TT_MusicSurge : TT_MusicSurge = ""            ' Storm Surge track; "" keeps the theme playing
+
 ' ---- Display -----------------------------------------------------------------
 Const TT_DMD_W = 256
 Const TT_DMD_H = 64

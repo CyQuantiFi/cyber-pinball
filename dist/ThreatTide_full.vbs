@@ -109,6 +109,10 @@ Dim TT_ContestMode : TT_ContestMode = True        ' High scores reset each day
 Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
+' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----
+Dim TT_MusicTheme : TT_MusicTheme = "theme.mp3"   ' Loops during play
+Dim TT_MusicSurge : TT_MusicSurge = ""            ' Storm Surge track; "" keeps the theme playing
+
 ' ---- Display -----------------------------------------------------------------
 Const TT_DMD_W = 256
 Const TT_DMD_H = 64
@@ -968,10 +972,22 @@ Sub TTPlay(cue)
 End Sub
 
 ' Music files live in VPX's Music folder under ThreatTide\
+' The current track loops: VPX calls Table1_MusicDone when it ends.
+Dim TTMusicTrack : TTMusicTrack = ""
+
 Sub TTMusic(track)
+    If track = TTMusicTrack And track <> "" Then Exit Sub   ' already playing
+    TTMusicTrack = track
     On Error Resume Next
     EndMusic
     If track <> "" Then PlayMusic "ThreatTide\" & track, TTVolume("music")
+    On Error GoTo 0
+End Sub
+
+Sub TTMusicLoop()
+    If TTMusicTrack = "" Then Exit Sub
+    On Error Resume Next
+    PlayMusic "ThreatTide\" & TTMusicTrack, TTVolume("music")
     On Error GoTo 0
 End Sub
 
@@ -1737,6 +1753,10 @@ Sub Table1_Init()
     End If
 End Sub
 
+Sub Table1_MusicDone()
+    TTMusicLoop
+End Sub
+
 Sub Table1_Exit()
     TTScoresSave
     TTDisplayExit
@@ -2013,7 +2033,7 @@ Sub TTEmit(kind, a, b)
         Case "surge_start"
             TTDisplayMessage "STORM SURGE", "45 SEC - CENTRE RAMP FOR TAIL JACKPOT", 2500, t
             TTPlay "storm_surge"
-            TTMusic "surge.mp3"
+            If TT_MusicSurge <> "" Then TTMusic TT_MusicSurge
         Case "surge_swing"
             TTDisplayMessage "SHARED WEATHER X" & a, "PEAK X" & b, 1000, t
         Case "surge_tail"
@@ -2021,7 +2041,7 @@ Sub TTEmit(kind, a, b)
             TTPlay "jackpot"
         Case "surge_end"
             If Not a Then TTDisplayMessage "STORM PASSED", "TAIL JACKPOT MISSED", TT_MSG_SHOW_MS, t
-            TTMusic "theme.mp3"
+            TTMusic TT_MusicTheme
         Case "gameover"
             TTMode = "gameover_wait"
             TTPlay "gameover"
@@ -2036,7 +2056,7 @@ Sub TTStartGame()
     TTResetAssets
     TTMode = "game"
     TTDisplayStartGame
-    TTMusic "theme.mp3"
+    TTMusic TT_MusicTheme
     TTG.StartGame GameTime
 End Sub
 

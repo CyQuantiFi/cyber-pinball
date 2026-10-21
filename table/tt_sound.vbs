@@ -70,9 +70,21 @@ Sub TTPlay(cue)
 End Sub
 
 ' Music files live in VPX's Music folder under ThreatTide\
+' The current track loops: VPX calls Table1_MusicDone when it ends.
+Dim TTMusicTrack : TTMusicTrack = ""
+
 Sub TTMusic(track)
+    If track = TTMusicTrack And track <> "" Then Exit Sub   ' already playing
+    TTMusicTrack = track
     On Error Resume Next
     EndMusic
     If track <> "" Then PlayMusic "ThreatTide\" & track, TTVolume("music")
+    On Error GoTo 0
+End Sub
+
+Sub TTMusicLoop()
+    If TTMusicTrack = "" Then Exit Sub
+    On Error Resume Next
+    PlayMusic "ThreatTide\" & TTMusicTrack, TTVolume("music")
     On Error GoTo 0
 End Sub

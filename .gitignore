@@ -6,3 +6,7 @@ Thumbs.db
 *.vpx.bak
 ThreatTide_games.jsonl
 ThreatTide_highscores.json
+# Licensed music stays out of this public repo (see docs/LICENSES.md)
+*.mp3
+*.ogg
+*.wav
