@@ -40,6 +40,7 @@ Needs Visual Pinball X 10.8, FlexDMD, and Chrome or Edge (standard on a virtual 
 3. Copy the repo's `dmd\` folder to `Tables\ThreatTide\` (the Comfortaa DMD fonts). Without it the DMD uses pixel fonts.
 4. Copy the music (below).
 5. Set the paths at the top of `start_booth.bat`, `backglass\start_backglass.bat` and (if used) `leaderboard\start_leaderboard.bat`, then start everything with `start_booth.bat`. If any table objects are missing, the DMD lists them for 20 seconds.
+6. Optional: send each game to CyQuantiFi. See [`cyquantifi-export.md`](cyquantifi-export.md) for the cabinet key, Python and `USE_UPLOAD=1`.
 
 ## Back screen: idle ad loop
 
@@ -87,11 +88,13 @@ The page works offline. It checks for new scores every 3 seconds and highlights 
 - Start the leaderboard screen; it shows "No losses yet today".
 - Volume preset "Booth" for loud halls; "Quiet" for small rooms (F12 menu).
 - Check the tablet is logged in to the form.
+- If uploading: set `TT_EventId` for this event before the show, and check `ThreatTide_upload.log` after the first game.
 
 **Close**
 - Photograph the high-score table on the DMD.
 - Copy `ThreatTide_games.jsonl` and `ThreatTide_highscores.json` from the VPX `User` folder to the event folder.
 - Pick the winner: top score, verified against the form entry.
+- If uploading: check `ThreatTide_upload.log` says the last game was sent. Games played offline are sent once the PC is back online; leave it running or run `python tools\uploader.py --once` later.
 
 ## After each show
 
