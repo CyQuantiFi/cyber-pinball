@@ -33,7 +33,7 @@ Add a collection notice above the submit button (see Privacy below) and a link t
 
 ## Installing on the cabinet
 
-Needs Visual Pinball X 10.8, FlexDMD, and Chrome or Edge (standard on a virtual pinball cabinet). The B2S Backglass Server is only needed if you switch the back screen to the static image (`TT_BackglassMode = "b2s"`).
+Needs Visual Pinball X 10.8, FlexDMD, and Chrome or Edge (standard on a virtual pinball cabinet). The B2S Backglass Server and DirectOutput are needed for cabinet feedback (contactors, button lamps, LED trim): see [`dof.md`](dof.md). B2S runs with its window hidden; the browser page owns the back screen unless you set `TT_BackglassMode = "b2s"`.
 
 1. Download the **ThreatTide-table** artifact from the latest green CI run (Actions tab), or run `bash tools/build_all.sh`. Copy this whole repo to the cabinet too (e.g. `C:\ThreatTide\`): the back screen, leaderboard and launchers run from it.
 2. Copy `ThreatTide.vpx` (and `ThreatTide.directb2s`, used only in `b2s` mode) into VPX's `Tables` folder.

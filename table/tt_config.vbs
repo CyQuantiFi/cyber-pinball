@@ -101,6 +101,7 @@ Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
 ' Back screen: "page" = browser backglass (backglass/index.html: art while
 ' playing, ad video + leaderboard when idle); "b2s" = static ThreatTide.directb2s
 Dim TT_BackglassMode : TT_BackglassMode = "page"
+Dim TT_DofOn : TT_DofOn = True                  ' Cabinet feedback via DOF (contactors, lamps, LEDs); see docs/dof.md
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
 ' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----

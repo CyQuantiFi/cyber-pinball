@@ -91,7 +91,7 @@ Low voltage:
 2. Displays: playfield = main display (VPX rotates the table for a cabinet), 24" = backglass, 12.3" = DMD. Turn off sleep and screen savers.
 3. Table: install as per [`docs/booth-runbook.md`](../docs/booth-runbook.md#installing-on-the-cabinet). Start the booth with `start_booth.bat`.
 4. Pinscape: calibrate the plunger and accelerometer, map the buttons to VPX keys, and enable the DOF outputs.
-5. **Software follow-up:** the table script doesn't send DOF events yet. Flippers, slings, the jackpot and the LEDs need DOF calls added to `table/tt_table.vbs` before the contactors and LED trim do anything. That is a small, separate change.
+5. **Feedback (DOF):** the table sends events for the flippers, slings, knocker, button lamps and LED trim. Map them to your outputs as described in [`docs/dof.md`](../docs/dof.md), and set coil time limits first.
 
 ## Transport
 

@@ -110,6 +110,7 @@ Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
 ' Back screen: "page" = browser backglass (backglass/index.html: art while
 ' playing, ad video + leaderboard when idle); "b2s" = static ThreatTide.directb2s
 Dim TT_BackglassMode : TT_BackglassMode = "page"
+Dim TT_DofOn : TT_DofOn = True                  ' Cabinet feedback via DOF (contactors, lamps, LEDs); see docs/dof.md
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
 ' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----
@@ -1230,6 +1231,142 @@ Sub RightFlipper_Collide(parm)
 End Sub
 
 ' ----------------------------------------------------------------------------
+' tt_dof.vbs
+' ----------------------------------------------------------------------------
+' =============================================================================
+' Threat Tide - cabinet feedback (DirectOutput Framework, DOF)
+'
+' The table sends numbered events; DOF turns them into contactor pulses,
+' button lamps and LED effects according to the cabinet's DOF config (see
+' docs/dof.md for the event list and a sample config). Events go through the
+' B2S Backglass Server, which the table starts even when the browser page owns
+' the back screen (hide the B2S window in its settings, see docs/dof.md).
+'
+' With TT_DofOn = False, or no B2S Server installed, every call is a no-op.
+' =============================================================================
+
+' Pulses (DOF config sets how long each output fires)
+Const DOF_FLIPPER_L = 101       ' on while the left flipper is up
+Const DOF_FLIPPER_R = 102       ' on while the right flipper is up
+Const DOF_SLING_L = 103
+Const DOF_SLING_R = 104
+Const DOF_RELEASE = 105         ' ball into the plunger lane
+Const DOF_KICKER = 106          ' Persistence / Impact scoop kick
+Const DOF_DROPTARGET = 107      ' asset drop target hit
+Const DOF_DROP_RESET = 108      ' asset bank reset
+Const DOF_KNOCKER = 109         ' extra ball, path complete, jackpots
+Const DOF_PLUNGER = 110         ' plunger released
+Const DOF_DRAIN = 111
+Const DOF_STAGE_HIT = 112       ' any stage shot collected (LED flash)
+Const DOF_CARD = 113            ' technique card shown (LED flash)
+
+' States (on until switched off)
+Const DOF_ATTRACT = 120
+Const DOF_GAME = 121            ' a game is running
+Const DOF_MULTIBALL = 122       ' Expert Consensus
+Const DOF_SURGE = 123           ' Storm Surge wizard mode
+Const DOF_TILT = 124            ' Incident declared (until the next ball)
+Const DOF_REPORT = 125          ' board report / initials after the game
+Const DOF_START_LAMP = 140      ' Start button lamp (lit when a game can start)
+Const DOF_LAUNCH_LAMP = 141     ' Launch button lamp (lit while a ball waits to launch)
+
+Dim TTDofCtl : Set TTDofCtl = Nothing   ' B2S.Server, set by TTDofAttach
+Dim TTDofStates : Set TTDofStates = CreateObject("Scripting.Dictionary")
+
+Sub TTDofAttach(ctl)
+    Set TTDofCtl = ctl
+    TTDofStates.RemoveAll
+End Sub
+
+Function TTDofActive()
+    TTDofActive = TT_DofOn And Not (TTDofCtl Is Nothing)
+End Function
+
+' state: 0 = off, 1 = on, 2 = pulse
+Sub TTDof(ev, state)
+    If Not TTDofActive() Then Exit Sub
+    On Error Resume Next
+    If state = 2 Then
+        TTDofCtl.B2SSetData ev, 1
+        TTDofCtl.B2SSetData ev, 0
+    Else
+        TTDofCtl.B2SSetData ev, state
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Sub TTDofPulse(ev)
+    TTDof ev, 2
+End Sub
+
+' On/off outputs: only send changes, so the per-tick state refresh is cheap.
+Sub TTDofSet(ev, isOn)
+    Dim v
+    If isOn Then v = 1 Else v = 0
+    If TTDofStates.Exists(ev) Then
+        If TTDofStates(ev) = v Then Exit Sub
+    End If
+    TTDofStates(ev) = v
+    TTDof ev, v
+End Sub
+
+' One place that maps the table's mode to the state outputs.
+Sub TTDofMode(mode)
+    TTDofSet DOF_ATTRACT, (mode = "attract" Or mode = "claim")
+    TTDofSet DOF_GAME, (mode = "game" Or mode = "gameover_wait")
+    TTDofSet DOF_REPORT, (mode = "report" Or mode = "initials")
+    TTDofSet DOF_START_LAMP, (mode = "attract" Or mode = "claim")
+    If mode <> "game" Then
+        TTDofSet DOF_MULTIBALL, False
+        TTDofSet DOF_SURGE, False
+        TTDofSet DOF_TILT, False
+        TTDofSet DOF_LAUNCH_LAMP, False
+    End If
+End Sub
+
+' Rule events (from TTEmit) that drive feedback. Display and sound stay in TTEmit.
+Sub TTDofEvent(kind, a)
+    Select Case kind
+        Case "ball"
+            TTDofSet DOF_TILT, False
+            TTDofSet DOF_LAUNCH_LAMP, True
+        Case "collected"
+            TTDofPulse DOF_STAGE_HIT
+        Case "card"
+            TTDofPulse DOF_CARD
+        Case "path", "extraball", "agreement", "surge_tail", "airgap"
+            TTDofPulse DOF_KNOCKER
+        Case "tilt"
+            TTDofSet DOF_TILT, True
+            TTDofSet DOF_FLIPPER_L, False
+            TTDofSet DOF_FLIPPER_R, False
+        Case "multiball"
+            TTDofSet DOF_MULTIBALL, True
+        Case "multiball_end"
+            TTDofSet DOF_MULTIBALL, False
+        Case "surge_start"
+            TTDofSet DOF_SURGE, True
+        Case "surge_end"
+            TTDofSet DOF_SURGE, False
+    End Select
+End Sub
+
+' Ball left the plunger lane
+Sub TTDofLaunched()
+    TTDofSet DOF_LAUNCH_LAMP, False
+End Sub
+
+' Everything off (table exit), so no contactor or lamp is left on.
+Sub TTDofAllOff()
+    Dim k, keys
+    keys = TTDofStates.Keys
+    For Each k In keys
+        TTDofSet k, False
+    Next
+End Sub
+
+' ----------------------------------------------------------------------------
 ' tt_display.vbs
 ' ----------------------------------------------------------------------------
 ' =============================================================================
@@ -2098,6 +2235,7 @@ End Sub
 Sub tmrTick_Timer()
     Dim t : t = GameTime
     TTRunTasks t
+    TTDofMode TTMode               ' only sends changes
     Select Case TTMode
         Case "game", "gameover_wait"
             TTG.Tick t
@@ -2134,10 +2272,12 @@ Sub Table1_KeyDown(ByVal keycode)
             If keycode = LeftFlipperKey And TTFlippersLive() Then
                 LeftFlipper.RotateToEnd
                 TTPlay "flipper"
+                TTDofSet DOF_FLIPPER_L, True
             End If
             If keycode = RightFlipperKey And TTFlippersLive() Then
                 RightFlipper.RotateToEnd
                 TTPlay "flipper"
+                TTDofSet DOF_FLIPPER_R, True
             End If
         Case "initials"
             TTInitialsKey keycode
@@ -2153,14 +2293,17 @@ Sub Table1_KeyUp(ByVal keycode)
     If keycode = PlungerKey Then
         Plunger.Fire
         TTPlay "plunger"
+        TTDofPulse DOF_PLUNGER
     End If
     If keycode = LeftFlipperKey Then
         If LeftFlipper.CurrentAngle <> LeftFlipper.StartAngle Then TTPlay "flipper_down"
         LeftFlipper.RotateToStart
+        TTDofSet DOF_FLIPPER_L, False
     End If
     If keycode = RightFlipperKey Then
         If RightFlipper.CurrentAngle <> RightFlipper.StartAngle Then TTPlay "flipper_down"
         RightFlipper.RotateToStart
+        TTDofSet DOF_FLIPPER_R, False
     End If
 End Sub
 
@@ -2183,6 +2326,7 @@ End Sub
 ' ---------------------------------------------------------------- playfield switches
 
 Sub swPlungerLane_UnHit()
+    TTDofLaunched
     If TTMode = "game" Then TTG.BallLaunched GameTime
 End Sub
 
@@ -2230,7 +2374,9 @@ End Function
 Dim TTB2S
 Sub TTBackglassStart()
     Set TTB2S = Nothing
-    If TT_BackglassMode <> "b2s" Then Exit Sub     ' the browser page owns the back screen
+    ' The browser page owns the back screen in "page" mode, but DOF feedback
+    ' still goes through B2S (with its window hidden in the B2S settings).
+    If TT_BackglassMode <> "b2s" And Not TT_DofOn Then Exit Sub
     On Error Resume Next
     Set TTB2S = CreateObject("B2S.Server")
     If Err.Number <> 0 Then
@@ -2241,9 +2387,11 @@ Sub TTBackglassStart()
     End If
     Err.Clear
     On Error GoTo 0
+    TTDofAttach TTB2S
 End Sub
 
 Sub TTBackglassStop()
+    TTDofAllOff
     On Error Resume Next
     If Not TTB2S Is Nothing Then TTB2S.Stop
     Err.Clear
@@ -2279,6 +2427,7 @@ Sub TTAssetHit(n)
     If TTAssetDown(n) Then Exit Sub
     TTAssetDown(n) = True
     TTPlay "droptarget"
+    TTDofPulse DOF_DROPTARGET
     If TTMode = "game" Then TTG.AssetDropped GameTime
     If TTAssetDown(0) And TTAssetDown(1) And TTAssetDown(2) Then
         TTSchedule "resetAssets", TT_ASSET_RESET_MS
@@ -2292,21 +2441,25 @@ Sub TTResetAssets()
     TTAssetDown(0) = False
     TTAssetDown(1) = False
     TTAssetDown(2) = False
+    TTDofPulse DOF_DROP_RESET
 End Sub
 
 Sub LeftSlingshot_Slingshot()
     TTFeelSling False
+    TTDofPulse DOF_SLING_L
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 
 Sub RightSlingshot_Slingshot()
     TTFeelSling True
+    TTDofPulse DOF_SLING_R
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 
 Sub Drain_Hit()
     Drain.DestroyBall
     TTPlay "drain"
+    TTDofPulse DOF_DRAIN
     If TTMode = "game" Then TTG.Drain GameTime
 End Sub
 
@@ -2315,18 +2468,21 @@ Sub TTAddMultiballBall()
     kImpact.CreateBall
     kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE
     TTPlay "kicker"
+    TTDofPulse DOF_KICKER
 End Sub
 
 Sub TTReleaseBall()
     BallRelease.CreateBall
     BallRelease.Kick TT_RELEASE_ANGLE, TT_RELEASE_FORCE
     TTPlay "release"
+    TTDofPulse DOF_RELEASE
 End Sub
 
 ' ---------------------------------------------------------------- rule events
 
 Sub TTEmit(kind, a, b)
     Dim t : t = GameTime
+    TTDofEvent kind, a
     Select Case kind
         Case "ball"
             If b Then
@@ -2550,8 +2706,8 @@ Sub TTRunTask(fullName)
     Select Case name
         Case "release":          TTReleaseBall
         Case "mbAdd":            TTAddMultiballBall
-        Case "kickPersistence":  kPersistence.Kick TT_KICK_PERSISTENCE_ANGLE, TT_KICK_PERSISTENCE_FORCE : TTPlay "kicker"
-        Case "kickImpact":       kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE : TTPlay "kicker"
+        Case "kickPersistence":  kPersistence.Kick TT_KICK_PERSISTENCE_ANGLE, TT_KICK_PERSISTENCE_FORCE : TTPlay "kicker" : TTDofPulse DOF_KICKER
+        Case "kickImpact":       kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE : TTPlay "kicker" : TTDofPulse DOF_KICKER
         Case "resetAssets":      TTResetAssets
         Case "report":           TTEnterReport
         Case "report_done":      TTEnterInitials

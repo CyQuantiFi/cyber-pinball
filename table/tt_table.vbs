@@ -101,6 +101,7 @@ End Sub
 Sub tmrTick_Timer()
     Dim t : t = GameTime
     TTRunTasks t
+    TTDofMode TTMode               ' only sends changes
     Select Case TTMode
         Case "game", "gameover_wait"
             TTG.Tick t
@@ -137,10 +138,12 @@ Sub Table1_KeyDown(ByVal keycode)
             If keycode = LeftFlipperKey And TTFlippersLive() Then
                 LeftFlipper.RotateToEnd
                 TTPlay "flipper"
+                TTDofSet DOF_FLIPPER_L, True
             End If
             If keycode = RightFlipperKey And TTFlippersLive() Then
                 RightFlipper.RotateToEnd
                 TTPlay "flipper"
+                TTDofSet DOF_FLIPPER_R, True
             End If
         Case "initials"
             TTInitialsKey keycode
@@ -156,14 +159,17 @@ Sub Table1_KeyUp(ByVal keycode)
     If keycode = PlungerKey Then
         Plunger.Fire
         TTPlay "plunger"
+        TTDofPulse DOF_PLUNGER
     End If
     If keycode = LeftFlipperKey Then
         If LeftFlipper.CurrentAngle <> LeftFlipper.StartAngle Then TTPlay "flipper_down"
         LeftFlipper.RotateToStart
+        TTDofSet DOF_FLIPPER_L, False
     End If
     If keycode = RightFlipperKey Then
         If RightFlipper.CurrentAngle <> RightFlipper.StartAngle Then TTPlay "flipper_down"
         RightFlipper.RotateToStart
+        TTDofSet DOF_FLIPPER_R, False
     End If
 End Sub
 
@@ -186,6 +192,7 @@ End Sub
 ' ---------------------------------------------------------------- playfield switches
 
 Sub swPlungerLane_UnHit()
+    TTDofLaunched
     If TTMode = "game" Then TTG.BallLaunched GameTime
 End Sub
 
@@ -233,7 +240,9 @@ End Function
 Dim TTB2S
 Sub TTBackglassStart()
     Set TTB2S = Nothing
-    If TT_BackglassMode <> "b2s" Then Exit Sub     ' the browser page owns the back screen
+    ' The browser page owns the back screen in "page" mode, but DOF feedback
+    ' still goes through B2S (with its window hidden in the B2S settings).
+    If TT_BackglassMode <> "b2s" And Not TT_DofOn Then Exit Sub
     On Error Resume Next
     Set TTB2S = CreateObject("B2S.Server")
     If Err.Number <> 0 Then
@@ -244,9 +253,11 @@ Sub TTBackglassStart()
     End If
     Err.Clear
     On Error GoTo 0
+    TTDofAttach TTB2S
 End Sub
 
 Sub TTBackglassStop()
+    TTDofAllOff
     On Error Resume Next
     If Not TTB2S Is Nothing Then TTB2S.Stop
     Err.Clear
@@ -282,6 +293,7 @@ Sub TTAssetHit(n)
     If TTAssetDown(n) Then Exit Sub
     TTAssetDown(n) = True
     TTPlay "droptarget"
+    TTDofPulse DOF_DROPTARGET
     If TTMode = "game" Then TTG.AssetDropped GameTime
     If TTAssetDown(0) And TTAssetDown(1) And TTAssetDown(2) Then
         TTSchedule "resetAssets", TT_ASSET_RESET_MS
@@ -295,21 +307,25 @@ Sub TTResetAssets()
     TTAssetDown(0) = False
     TTAssetDown(1) = False
     TTAssetDown(2) = False
+    TTDofPulse DOF_DROP_RESET
 End Sub
 
 Sub LeftSlingshot_Slingshot()
     TTFeelSling False
+    TTDofPulse DOF_SLING_L
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 
 Sub RightSlingshot_Slingshot()
     TTFeelSling True
+    TTDofPulse DOF_SLING_R
     If TTMode = "game" Then TTG.EdrHit GameTime
 End Sub
 
 Sub Drain_Hit()
     Drain.DestroyBall
     TTPlay "drain"
+    TTDofPulse DOF_DRAIN
     If TTMode = "game" Then TTG.Drain GameTime
 End Sub
 
@@ -318,18 +334,21 @@ Sub TTAddMultiballBall()
     kImpact.CreateBall
     kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE
     TTPlay "kicker"
+    TTDofPulse DOF_KICKER
 End Sub
 
 Sub TTReleaseBall()
     BallRelease.CreateBall
     BallRelease.Kick TT_RELEASE_ANGLE, TT_RELEASE_FORCE
     TTPlay "release"
+    TTDofPulse DOF_RELEASE
 End Sub
 
 ' ---------------------------------------------------------------- rule events
 
 Sub TTEmit(kind, a, b)
     Dim t : t = GameTime
+    TTDofEvent kind, a
     Select Case kind
         Case "ball"
             If b Then
@@ -553,8 +572,8 @@ Sub TTRunTask(fullName)
     Select Case name
         Case "release":          TTReleaseBall
         Case "mbAdd":            TTAddMultiballBall
-        Case "kickPersistence":  kPersistence.Kick TT_KICK_PERSISTENCE_ANGLE, TT_KICK_PERSISTENCE_FORCE : TTPlay "kicker"
-        Case "kickImpact":       kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE : TTPlay "kicker"
+        Case "kickPersistence":  kPersistence.Kick TT_KICK_PERSISTENCE_ANGLE, TT_KICK_PERSISTENCE_FORCE : TTPlay "kicker" : TTDofPulse DOF_KICKER
+        Case "kickImpact":       kImpact.Kick TT_KICK_IMPACT_ANGLE, TT_KICK_IMPACT_FORCE : TTPlay "kicker" : TTDofPulse DOF_KICKER
         Case "resetAssets":      TTResetAssets
         Case "report":           TTEnterReport
         Case "report_done":      TTEnterInitials

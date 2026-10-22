@@ -11,17 +11,20 @@
     <script language="VBScript" src="../table/tt_money.vbs"/>
     <script language="VBScript" src="../table/tt_rules.vbs"/>
     <script language="VBScript" src="../table/tt_scores.vbs"/>
+    <script language="VBScript" src="../table/tt_dof.vbs"/>
     <script language="VBScript" src="test_lib.vbs"/>
     <script language="VBScript" src="test_money.vbs"/>
     <script language="VBScript" src="test_rules.vbs"/>
     <script language="VBScript" src="test_scores.vbs"/>
     <script language="VBScript" src="test_modes.vbs"/>
+    <script language="VBScript" src="test_dof.vbs"/>
     <script language="VBScript"><![CDATA[
       Randomize
       RunMoneyTests
       RunRulesTests
       RunScoresTests
       RunModesTests
+      RunDofTests
       T_Finish
     ]]></script>
   </job>

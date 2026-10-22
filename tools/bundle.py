@@ -20,6 +20,7 @@ MODULES = [
     "tt_rules.vbs",
     "tt_sound.vbs",
     "tt_feel.vbs",
+    "tt_dof.vbs",
     "tt_display.vbs",
     "tt_scores.vbs",
     "tt_table.vbs",
