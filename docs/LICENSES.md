@@ -1,5 +1,7 @@
 # Asset licences
 
+This repository is MIT-licensed ([`LICENSE`](../LICENSE)). The rows below are third-party or separately sourced assets that keep their own terms.
+
 > **Check before the first show: Visual Pinball X licence.** VPX has been moving to GPLv3+ since 2020, but files without a GPL marker are still under its older licence, which says redistributions "may not be sold, nor may they be used in a commercial product or activity". A booth used for marketing could count as commercial activity, both for running VPX and for the blank-table parts inside `ThreatTide.vpx`. Get a view from legal, or ask the VPX team (github.com/vpinball/vpinball), before the first show.
 
 Every font, image, sound and music file in the table, backglass or display must have a row here before it goes to a show. Original table only: no third-party characters, logos or licensed music.

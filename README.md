@@ -56,3 +56,7 @@ What's left needs a Windows PC with VPX: play the built table, tune physics and 
 Cabinet: a build-it-yourself design is in [`cabinet/`](cabinet/README.md).
 
 Open questions from the spec: author budget and deadline, first target show, daily prize.
+
+## Licence
+
+Code, cabinet design files and original artwork are under the [MIT Licence](LICENSE). Third-party assets keep their own licences ([`docs/LICENSES.md`](docs/LICENSES.md)): Comfortaa is under the SIL OFL, and the VPX blank table is downloaded at build time under the VPX licence. The licence doesn't grant use of the CyQuantiFi name or logo as a trademark.
