@@ -23,6 +23,7 @@ All dollar values are game-design numbers for fun. They are not CyQuantiFi model
 | `sound/sfx/` | Game-cue sound effects, synthesized by `tools/make_sfx.py` (original, no licence to track). |
 | `leaderboard/` | Live leaderboard page for the booth's second screen. Runs from disk, no server or internet. |
 | `backglass/` | Browser backglass for the cabinet's back screen: art + live score while playing, ad video / promo + leaderboard when idle. |
+| `cabinet/` | Wooden cabinet: parametric CAD (DXF cut files, A3 drawings, 3D model, renders), parts list and build guide. Start at [`cabinet/README.md`](cabinet/README.md). |
 | `start_booth.bat` | Starts the back screen, leaderboard and table in the right order. |
 | `docs/` | Object contract, author brief, tuning guide, acceptance tests, booth runbook, licences. |
 
@@ -52,4 +53,6 @@ On Windows: `cd tests && cscript //nologo run_tests.wsf`. CI runs all of these o
 
 What's left needs a Windows PC with VPX: play the built table, tune physics and shot geometry, finish the art, record voice callouts, then cabinet playtesting against [`docs/acceptance.md`](docs/acceptance.md).
 
-Open questions from the spec: cabinet (buy, build or hire), author budget and deadline, first target show, daily prize.
+Cabinet: a build-it-yourself design is in [`cabinet/`](cabinet/README.md).
+
+Open questions from the spec: author budget and deadline, first target show, daily prize.

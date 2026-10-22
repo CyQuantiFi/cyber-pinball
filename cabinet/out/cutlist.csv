@@ -1,0 +1,30 @@
+id,part,module,material,width_mm,height_mm,qty,made_by,kg_total,notes
+P01,Body side L,body,18 mm plywood,1060.0,380.8,1,CNC,3.6,Pockets are on the inside face. R is the mirror of L.
+P02,Body side R,body,18 mm plywood,1060.0,380.8,1,CNC,3.6,Pockets are on the inside face. R is the mirror of L.
+P03,Body floor,body,18 mm plywood,576.0,1060.0,1,CNC,6.4,Tee nuts (M8) pressed in from the top for the leg bolts.
+P04,Body front,body,18 mm plywood,576.0,211.2,1,CNC,1.3,Plunger flange holes: drill to your plunger kit on assembly.
+P05,Coin door overlay,body,6 mm plywood,220.0,165.0,1,CNC,0.1,Paint silver or wrap in brushed vinyl. Slots are decorative.
+P06,Body back,body,18 mm plywood,576.0,341.6,1,CNC,1.4,
+P07,Back service cover,body,6 mm plywood,390.0,220.0,1,CNC,0.3,Screws on with 4 x M4 into the back panel. Vents for the PC.
+P08,Rear deck,body,18 mm plywood,576.0,247.5,1,CNC,1.5,Tee nuts on the underside for the backbox bolts.
+P09,Playfield glass,body,5 mm toughened glass,574.0,795.9,1,supplier,5.7,"5 mm toughened, edges arrised. Order cut to size from a glazier."
+P10,Playfield mask,body,6 mm MDF,574.0,795.9,1,CNC,0.8,Paint matt black. Window = TV visible area; check against your TV and adjust TV_VIEW.
+P11,Lockbar,body,18 mm plywood,600.0,100.0,1,CNC,0.6,Round over the front edge (R9) and wrap in brushed vinyl or cap with aluminium angle.
+P12,Lockbar stop strip,body,18 mm plywood,563.0,26.5,1,CNC,0.2,Glued and screwed under the lockbar; holds the glass and mask in.
+P13,TV crossbar 1,body,18 mm plywood,562.0,80.0,1,CNC,0.5,Lift-out. 3 mm foam tape on top presses the TV up against the mask.
+P14,TV crossbar 2,body,18 mm plywood,562.0,80.0,1,CNC,0.5,Lift-out. 3 mm foam tape on top presses the TV up against the mask.
+P15,Crossbar cleat,body,18 mm plywood,40.0,100.0,4,CNC,0.2,Glue and screw to the sides on the layout marks.
+P16,Side light panel L,body,3 mm clear cast acrylic,690.0,200.0,1,CNC,0.5,"3 mm clear cast acrylic, engraved on the face against the cabinet (text is pre-mirrored). 12 mm standoffs; LED strip in a channel under the bottom edge."
+P17,Side light panel R,body,3 mm clear cast acrylic,690.0,200.0,1,CNC,0.5,"3 mm clear cast acrylic, engraved on the face against the cabinet (text is pre-mirrored). 12 mm standoffs; LED strip in a channel under the bottom edge."
+P18,Backbox side L,backbox,18 mm plywood,236.0,586.0,1,CNC,1.4,Pockets on the inside face. R is the mirror of L.
+P19,Backbox side R,backbox,18 mm plywood,236.0,586.0,1,CNC,1.4,Pockets on the inside face. R is the mirror of L.
+P20,Backbox bottom,backbox,18 mm plywood,576.0,237.0,1,CNC,1.5,M8 bolts down through here into the deck tee nuts.
+P21,Backbox top,backbox,18 mm plywood,576.0,236.0,1,CNC,1.4,Bezel groove is on the underside (flip the part for that op).
+P22,Speaker / DMD panel,backbox,18 mm plywood,576.0,170.0,1,CNC,0.6,DMD pocket is on the BACK face (flip the part for that op): the LCD sits in it.
+P23,Monitor bezel,backbox,6 mm MDF,576.0,383.3,1,CNC,0.3,"Paint matt black. Window = 24"" visible area; check against your monitor."
+P24,Monitor board,backbox,18 mm plywood,576.0,377.3,1,CNC,2.2,VESA 100 holes; slots for cables and airflow.
+P25,Backbox back,backbox,6 mm plywood,600.0,559.1,1,CNC,1.3,Removable for bolting the backbox down and for service.
+P26,Leg frame plate,legs,18 mm plywood,600.0,590.0,4,CNC,10.3,Glue two plates face to face for each leg frame (4 plates make 2 frames).
+P27,Leg top plate,legs,18 mm plywood,600.0,160.0,2,CNC,2.1,Glue and screw down into the frame edge. M8 knob bolts go up through the outer holes.
+P28,Leg stretcher,legs,18 mm plywood,886.0,134.7,1,CNC,1.2,Through-tenons pass the leg frames; a wedge in each end locks it. No tools.
+P29,Wedge,legs,18 mm plywood,110.0,24.0,2,CNC,0.0,Tap in from either side to pull the leg frame tight.

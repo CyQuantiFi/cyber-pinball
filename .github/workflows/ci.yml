@@ -81,3 +81,16 @@ jobs:
         with:
           name: ThreatTide-promo
           path: dist/promo.mp4
+
+  cabinet:
+    # Cabinet CAD: no part or bought component collides, and the parts still nest on the sheets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python packages
+        run: pip install -r cabinet/requirements.txt
+      - name: Clearance check and nesting
+        run: python3 cabinet/make_cabinet.py --check
