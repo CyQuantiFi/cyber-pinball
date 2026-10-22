@@ -59,6 +59,13 @@ Dry-fit everything first. Glue goes in the dados; 8g x 40 screws go through the 
 
 Fill, sand 120 then 240, prime, and paint 2 coats of satin black (or wrap in vinyl). Leave the inside bare. Paint the mask (P10) and bezel (P23) matt black. Apply side-art vinyl if you are using it.
 
+## 5a. Vinyl skins
+
+1. Fit M4 inserts into the skin fixing holes (17 holes, 6 mm, drilled by the CNC in the sides, front and backbox sides).
+2. Get the skins made: send `out/skins/<livery>/*.pdf` with the matching DXFs (`out/dxf/P30` to `P35`) to a sign shop. Or have the vinyl printed and laminated, apply it to ACM, and route it on your CNC face-up (single-flute bit, film on).
+3. Body side skins are held by the light-panel standoffs plus 3 screws. The front skin goes on before the coin plate. The backbox front skin is held by the speaker grille screws.
+4. For the generic box, fit the generic skins and leave the acrylic light panels off (or fit panels engraved with the client's logo).
+
 ## 6. Fit-out
 
 The layout matches `out/render/cabinet_inside.png`; every box there is clearance-checked.

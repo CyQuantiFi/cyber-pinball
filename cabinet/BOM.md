@@ -76,6 +76,16 @@ On the PC: VPX 10.8 should run a light table like Threat Tide at 4K 60 Hz on an 
 | 36 | 3 mm clear cast acrylic 1200 x 600 (two side panels) + 8 x M4 12 mm standoffs | 1 | Bunnings / plastics supplier | $85 | Feature |
 | 37 | Two more 24 V contactors (slingshots / bumpers) | 2 | RS Components | $180 | Feature |
 
+## Vinyl skins (for the rental options)
+
+Not in the totals above. You need one set of ACM panels per livery you keep. A client's own set is a hire add-on: they pay for it and keep it.
+
+| # | Item | Qty | Where | Est. |
+| --- | --- | --- | --- | --- |
+| 38 | 3 mm ACM sheet 2440 x 1220 (all 6 skins fit on one) | 1 per livery | Sign supplier (e.g. Signwarehouse, Sign Supplies) | $90 |
+| 39 | Print + laminate about 1.3 m2 of vinyl (with bleed), applied to the ACM | 1 per livery | Local sign shop | $180–300 |
+| 40 | M4 threaded inserts (17) + M4 black button-head screws | 1 set | Bunnings | $25 |
+
 ## Lean build: about $3,700
 
 These swaps cut the price while keeping everything you asked for, except the bass shakers and lit side panels, which can be added later:

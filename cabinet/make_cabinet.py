@@ -39,14 +39,15 @@ import geometry as G                                 # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
-SHEET = dict(ply18=(2400, 1200), ply6=(2400, 1200), mdf6=(2400, 1200), acrylic3=(1200, 600))
+SHEET = dict(ply18=(2400, 1200), ply6=(2400, 1200), mdf6=(2400, 1200), acrylic3=(1200, 600), acm3=(2440, 1220))
 MAT_NAME = dict(ply18="18 mm plywood", ply6="6 mm plywood", mdf6="6 mm MDF", glass5="5 mm toughened glass",
-                acrylic3="3 mm clear cast acrylic")
+                acrylic3="3 mm clear cast acrylic", acm3="3 mm ACM (aluminium composite) + printed vinyl")
 GAP, MARGIN = 14.0, 15.0     # spacing between nested parts (6 mm bit + tabs) and sheet edge margin
 PAINTED = {"Body side L", "Body side R", "Body front", "Body back", "Backbox side L", "Backbox side R",
            "Backbox top", "Backbox back", "Leg frame plate", "Leg top plate", "Leg stretcher", "Wedge",
            "Speaker / DMD panel", "Rear deck", "Backbox bottom", "Body floor", "Lockbar stop strip",
-           "Back service cover"}
+           "Back service cover", "Skin body side L", "Skin body side R", "Skin front", "Skin backbox side L",
+           "Skin backbox side R", "Skin backbox front"}
 BACKBOX_COMPS = ("24in", "DMD", "4in speaker")
 
 
@@ -365,6 +366,27 @@ def render(objs, path, az=-35, el=24, size=(1600, 1200), ss=2, light=(-0.4, -0.6
     im.save(path)
 
 
+def acrylic_textures(parts):
+    """Glowing engraved text on the edge-lit side panels (render only)."""
+    from PIL import ImageDraw, ImageFilter, ImageFont
+    font = ImageFont.truetype(os.path.join(HERE, "..", "art/fonts/Comfortaa-VariableFont_wght.ttf"), 300)
+    acr = {}
+    for p in parts:
+        if p.material == "acrylic3":
+            x0, y0, x1, y1 = p.outline.bounds
+            im = Image.new("RGB", (int((x1 - x0) * 4), int((y1 - y0) * 4)), (60, 140, 150))
+            glow = Image.new("RGB", im.size, (0, 0, 0))
+            ImageDraw.Draw(glow).text((im.width / 2, im.height / 2), "THREAT TIDE", font=font, fill=(120, 255, 255),
+                                      anchor="mm")
+            im = Image.fromarray(np.clip(np.asarray(im, float) + np.asarray(glow.filter(ImageFilter.GaussianBlur(14)), float)
+                                         + np.asarray(glow, float) * 0.8, 0, 255).astype(np.uint8))
+            if not p.frame.mirrored:
+                im = im.transpose(Image.FLIP_LEFT_RIGHT)
+            acr[p.name] = dict(img=np.asarray(im, float) / 255, frame=p.frame, axes=(0, 1), face=(2, 0.0),
+                               rect=(x0, y0, x1, y1))
+    return acr
+
+
 # ---------------------------------------------------------------- PDF helpers
 A3 = (16.535, 11.693)
 
@@ -471,7 +493,8 @@ def main():
     for d in ("dxf", "sheets", "stl", "render"):
         os.makedirs(os.path.join(OUT, d), exist_ok=True)
         for f in os.listdir(os.path.join(OUT, d)):
-            os.remove(os.path.join(OUT, d, f))
+            if not f.startswith("livery_"):      # those come from make_skins.py
+                os.remove(os.path.join(OUT, d, f))
     parts, comps = G.build()
     problems = G.check(parts, comps)
     print("clearance check:", "OK" if not problems else "\n  " + "\n  ".join(problems))
@@ -564,22 +587,7 @@ def main():
     shown = [c for c in comps if c.name != "Hand room"]
     comp_objs = [(comp_mesh(c), c.color, -0.2, tex.get(c.name)) for c in shown]
     screens = [o for o, c in zip(comp_objs, shown) if c.name in tex or "Plunger knob" in c.name or "speaker" in c.name]
-    from PIL import ImageDraw, ImageFilter, ImageFont
-    font = ImageFont.truetype(os.path.join(HERE, "..", "art/fonts/Comfortaa-VariableFont_wght.ttf"), 300)
-    acr = {}
-    for p in parts:
-        if p.material == "acrylic3":
-            x0, y0, x1, y1 = p.outline.bounds
-            im = Image.new("RGB", (int((x1 - x0) * 4), int((y1 - y0) * 4)), (60, 140, 150))
-            glow = Image.new("RGB", im.size, (0, 0, 0))
-            ImageDraw.Draw(glow).text((im.width / 2, im.height / 2), "THREAT TIDE", font=font, fill=(120, 255, 255),
-                                      anchor="mm")
-            im = Image.fromarray(np.clip(np.asarray(im, float) + np.asarray(glow.filter(ImageFilter.GaussianBlur(14)), float)
-                                         + np.asarray(glow, float) * 0.8, 0, 255).astype(np.uint8))
-            if not p.frame.mirrored:
-                im = im.transpose(Image.FLIP_LEFT_RIGHT)
-            acr[p.name] = dict(img=np.asarray(im, float) / 255, frame=p.frame, axes=(0, 1), face=(2, 0.0),
-                               rect=(x0, y0, x1, y1))
+    acr = acrylic_textures(parts)
     vis = [(m, part_color(p), part_bias(p), acr.get(p.name)) for p, m in objs_parts if p.material != "glass5"]
     rd = os.path.join(OUT, "render")
     if os.environ.get("SKIP_RENDER") != "1":

@@ -26,11 +26,28 @@ The cabinet breaks down into three modules, with no tools needed for the legs:
 
 | Module | Size (mm) | Weight, wood only | Weight, fitted out | Carry |
 | --- | --- | --- | --- | --- |
-| Body (with the playfield monitor and PC inside) | 630 x 1072 x 381 | 28 kg | ~41 kg | 2 people, hand slots at each end |
-| Backbox | 600 x 244 x 586 | 10 kg | ~16 kg | 1 person, slots in the sides |
+| Body (with the playfield monitor and PC inside) | 630 x 1075 x 381 | 31 kg | ~44 kg | 2 people, hand slots at each end |
+| Backbox | 606 x 245 x 586 | 11 kg | ~17 kg | 1 person, slots in the sides |
 | Legs (2 frames + stretcher) | each frame 600 x 608 x 36 | 14 kg | 14 kg | 1 person |
 
-Weights are estimates. Breakdown and setup take about 10 minutes each; see [BUILD.md](BUILD.md#transport).
+Weights are estimates and include the vinyl skins. Breakdown and setup take about 10 minutes each; see [BUILD.md](BUILD.md#transport).
+
+## Vinyl skins and liveries
+
+The outside is covered by removable printed vinyl on 3 mm ACM (aluminium composite) panels: body sides, front, backbox sides, and the speaker panel. Swapping a livery takes about 15 minutes and needs no repainting. That is what makes the rental options work: the generic box, the client's own vinyl, or the Threat Tide look for your own shows.
+
+![Livery options: Threat Tide, generic, client reskin](out/render/livery_options.png)
+
+| Folder | What |
+| --- | --- |
+| `out/skins/threattide/` | CyQuantiFi / Threat Tide livery, print-ready PDF per panel |
+| `out/skins/generic/` | Neutral satin black, no branding ("generic box") |
+| `out/skins/vendor-demo/` | Example client reskin, to show vendors what they get |
+| `out/skins/template/` | Guide sheets (PDF + SVG) for a client's designer: trim, 5 mm bleed, 10 mm safe zone, cut-outs, and the light-panel zone |
+
+Every file is 1:1 in mm, seen from the outside, with 5 mm bleed. Send the PDF plus the matching cut file (`out/dxf/P30` to `P35`) to a sign shop. They print, laminate, apply to ACM and route it, or you route the ACM on your CNC. Regenerate with `python3 cabinet/make_skins.py`; the logo is a text placeholder until there's a real logo file.
+
+For a client reskin, either their designer works on the template, or you swap the colours and words in `LIVERIES` at the top of `make_skins.py`.
 
 ## Files
 
@@ -46,6 +63,7 @@ Weights are estimates. Breakdown and setup take about 10 minutes each; see [BUIL
 | `out/stl/*.stl` | One mesh per transport module (for Fusion 360 / SketchUp mesh import) |
 | `geometry.py` | The design: every number and every part |
 | `make_cabinet.py` | Turns `geometry.py` into all of the above |
+| `make_skins.py` | Vinyl print files, templates and livery renders |
 
 ### DXF layers
 

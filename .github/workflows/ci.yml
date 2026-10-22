@@ -94,3 +94,5 @@ jobs:
         run: pip install -r cabinet/requirements.txt
       - name: Clearance check and nesting
         run: python3 cabinet/make_cabinet.py --check
+      - name: Vinyl skins still generate
+        run: python3 cabinet/make_skins.py --no-render

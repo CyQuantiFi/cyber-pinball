@@ -65,6 +65,9 @@ TV_LEN, TV_W, TV_DEP = P["TV"]
 TV_S0 = P["LOCKBAR"] + 5 - (TV_LEN - P["TV_VIEW"][0]) / 2
 TV_D = (MASK_D[1] + 1, MASK_D[1] + 1 + TV_DEP)
 XC = W / 2
+SIDE_SKIN_FIX = [(25.0, 30.0), (L - 25, 30.0), (L - 25, HF + (L - 25) * math.tan(math.radians(P["SLOPE"])) - 30)]
+FRONT_SKIN_FIX = [(30.0, 40.0), (W - 30, 40.0), (30.0, 205.0), (W - 30, 205.0)]
+SKIN = 3.0                  # printed vinyl skins on 3 mm ACM panels (removable)
 
 
 def top(y):
@@ -146,8 +149,8 @@ class Part:
         return self.solid().area / 1e6
 
 
-DENS = dict(ply18=600, ply6=650, mdf6=750, glass5=2500, acrylic3=1190)
-COL = dict(ply18=(0.80, 0.66, 0.46), ply6=(0.78, 0.68, 0.52), mdf6=(0.12, 0.12, 0.14),
+DENS = dict(ply18=600, ply6=650, mdf6=750, glass5=2500, acrylic3=1190, acm3=1300)
+COL = dict(ply18=(0.80, 0.66, 0.46), ply6=(0.78, 0.68, 0.52), mdf6=(0.12, 0.12, 0.14), acm3=(0.09, 0.10, 0.13),
            glass5=(0.70, 0.85, 0.95), acrylic3=(0.55, 0.95, 1.0))
 PAINT = (0.07, 0.09, 0.14)   # cabinet paint / vinyl colour for renders
 
@@ -222,6 +225,7 @@ def build():
         sp.cuts += [slot(y, hand_z, 130, 36) for y in hand_y]
         # standoffs for the edge-lit side panel (outer face)
         sp.circles += [(y, z, 5.0, "DRILL") for y in (260, 840) for z in (60, 200)]
+        sp.circles += [(y, z, 6.0, "DRILL") for y, z in SIDE_SKIN_FIX]     # M4 inserts for the skin
         for sc in (250.0, 680.0):     # crossbar cleat positions (layout marks)
             y0, z0 = slope_pt(sc - 50, TV_D[1] + 1 + T)
             y1, z1 = slope_pt(sc + 50, TV_D[1] + 1 + T)
@@ -244,10 +248,11 @@ def build():
                       (W - 120, 120, 30.0, "CUT_INSIDE"),     # Launch
                       (plunger[0], plunger[1], 25.0, "CUT_INSIDE"),
                       (XC, 150, 30.0, "CUT_INSIDE")]          # Exit (through the coin door)
+    front.circles += [(x, z, 6.0, "DRILL") for x, z in FRONT_SKIN_FIX]       # M4 inserts for the skin
     front.notes = "Plunger flange holes: drill to your plunger kit on assembly."
     add(front)
 
-    coin = Part("Coin door overlay", "body", "ply6", T6, rect(XC - 110, 40, XC + 110, 205), F_xz(-T6, T6))
+    coin = Part("Coin door overlay", "body", "ply6", T6, rect(XC - 110, 40, XC + 110, 205), F_xz(-T6 - SKIN, T6))
     coin.circles += [(XC, 150, 24.0, "CUT_INSIDE")]
     coin.circles += [(XC + dx, 75 + dy, 4.0, "DRILL") for dx in (-95, 95) for dy in (0, 110)]
     coin.cuts += [rect(XC - 70, 85, XC - 64, 125), rect(XC + 64, 85, XC + 70, 125)]    # coin slots
@@ -354,6 +359,8 @@ def build():
             (rect(ybrd, zsp1, ybrd + T + FIT, zt - T + 1), DADO),              # monitor board (stopped)
         ]
         bs.cuts += [slot((y0b + y1b) / 2, zt - 70, 120, 36)]                    # carry handle
+        bb_fix = [(y0b + 25, top(y0b + 25) + 30), (y1b - 25, top(y1b - 25) + 30), (y0b + 25, zt - 30), (y1b - 25, zt - 30)]
+        bs.circles += [(y, z, 6.0, "DRILL") for y, z in bb_fix]
         bs.notes = "Pockets on the inside face. R is the mirror of L."
         add(bs)
 
@@ -438,6 +445,43 @@ def build():
     wd.frame = wd.frames[0]
     wd.notes = "Tap in from either side to pull the leg frame tight."
     add(wd)
+
+    # --------------------------------------------------------------- skins
+    # Printed vinyl on 3 mm ACM: one set per livery, swapped between hires.
+    # Each skin's cut face (w = t) is its outer, printed face.
+    skin_side = Polygon([(1, 1), (L - 1, 1), (L - 1, top(L) - 1), (1, top(1) - 1)])
+    for nm, xo, d in (("Skin body side L", 0, -1), ("Skin body side R", W, 1)):
+        sk = Part(nm, "body", "acm3", SKIN, skin_side, F_side(xo, d))
+        sk.circles += [(85, btn_v, 28.6, "CUT_INSIDE")]
+        sk.cuts += [slot(y, hand_z, 130, 36) for y in hand_y]
+        sk.circles += [(y, z, 5.0, "CUT_INSIDE") for y in (260, 840) for z in (60, 200)]
+        sk.circles += [(y, z, 4.5, "CUT_INSIDE") for y, z in SIDE_SKIN_FIX]
+        sk.skin = True
+        sk.notes = "Printed vinyl on 3 mm ACM. Held by the light-panel standoffs and 3 x M4 screws."
+        add(sk)
+    fs = Part("Skin front", "body", "acm3", SKIN, rect(-SKIN, 1, W + SKIN, front_top - 1), F_xz(-SKIN, SKIN))
+    fs.circles += [(90, 150, 30.0, "CUT_INSIDE"), (W - 120, 120, 30.0, "CUT_INSIDE"),
+                   (plunger[0], plunger[1], 25.0, "CUT_INSIDE"), (XC, 150, 30.0, "CUT_INSIDE")]
+    fs.circles += [(XC + dx, 75 + dy, 4.0, "CUT_INSIDE") for dx in (-95, 95) for dy in (0, 110)]
+    fs.circles += [(x, z, 4.5, "CUT_INSIDE") for x, z in FRONT_SKIN_FIX]
+    fs.skin = True
+    fs.notes = "The coin-door plate screws on over it. 4 x M4 at the corners."
+    add(fs)
+    for nm, xo, d in (("Skin backbox side L", 0, -1), ("Skin backbox side R", W, 1)):
+        sk = Part(nm, "backbox", "acm3", SKIN, bb_out.buffer(-1, join_style=2), F_side(xo, d))
+        sk.cuts += [slot((y0b + y1b) / 2, zt - 70, 120, 36)]
+        sk.circles += [(y, z, 4.5, "CUT_INSIDE") for y, z in bb_fix]
+        sk.skin = True
+        sk.notes = "4 x M4 screws into inserts in the backbox side."
+        add(sk)
+    bf = Part("Skin backbox front", "backbox", "acm3", SKIN, rect(-SKIN, zsp0 + 1, W + SKIN, zsp1 - 1), F_xz(y0b - SKIN, SKIN))
+    bf.cuts += [rect(XC - dvw / 2, zmid - dvh / 2, XC + dvw / 2, zmid + dvh / 2)]
+    for x in (spx, W - spx):
+        bf.circles.append((x, zmid, P["SPK_CUT"], "CUT_INSIDE"))
+        bf.circles += [(x + dx, zmid + dy, 4.0, "CUT_INSIDE") for dx in (-41, 41) for dy in (-41, 41)]
+    bf.skin = True
+    bf.notes = "Held by the speaker grille screws."
+    add(bf)
 
     comps = components(dict(btn_v=btn_v, plunger=plunger, hand_y=hand_y, hand_z=hand_z, zsp0=zsp0,
                             zsp1=zsp1, zmid=zmid, zmon=zmon, ymon=ymon, spx=spx, y0b=y0b, zl0=zl0))

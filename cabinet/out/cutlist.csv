@@ -28,3 +28,9 @@ P26,Leg frame plate,legs,18 mm plywood,600.0,590.0,4,CNC,10.3,Glue two plates fa
 P27,Leg top plate,legs,18 mm plywood,600.0,160.0,2,CNC,2.1,Glue and screw down into the frame edge. M8 knob bolts go up through the outer holes.
 P28,Leg stretcher,legs,18 mm plywood,886.0,134.7,1,CNC,1.2,Through-tenons pass the leg frames; a wedge in each end locks it. No tools.
 P29,Wedge,legs,18 mm plywood,110.0,24.0,2,CNC,0.0,Tap in from either side to pull the leg frame tight.
+P30,Skin body side L,body,3 mm ACM (aluminium composite) + printed vinyl,1058.0,378.8,1,CNC,1.3,Printed vinyl on 3 mm ACM. Held by the light-panel standoffs and 3 x M4 screws.
+P31,Skin body side R,body,3 mm ACM (aluminium composite) + printed vinyl,1058.0,378.8,1,CNC,1.3,Printed vinyl on 3 mm ACM. Held by the light-panel standoffs and 3 x M4 screws.
+P32,Skin front,body,3 mm ACM (aluminium composite) + printed vinyl,606.0,227.2,1,CNC,0.5,The coin-door plate screws on over it. 4 x M4 at the corners.
+P33,Skin backbox side L,backbox,3 mm ACM (aluminium composite) + printed vinyl,234.0,583.9,1,CNC,0.5,4 x M4 screws into inserts in the backbox side.
+P34,Skin backbox side R,backbox,3 mm ACM (aluminium composite) + printed vinyl,234.0,583.9,1,CNC,0.5,4 x M4 screws into inserts in the backbox side.
+P35,Skin backbox front,backbox,3 mm ACM (aluminium composite) + printed vinyl,606.0,168.0,1,CNC,0.2,Held by the speaker grille screws.
