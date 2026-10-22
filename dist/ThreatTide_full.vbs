@@ -2070,15 +2070,23 @@ Function TTNextGameSeq()
 End Function
 
 ' Minutes east of UTC right now, or Empty if it can't be found.
-' TT_UtcOffsetMin wins; otherwise Windows' ActiveTimeBias (which includes
-' daylight saving) is read from the registry.
+' TT_UtcOffsetMin wins. Otherwise Windows is asked two ways, both of which
+' include daylight saving: the registry's ActiveTimeBias, then WMI.
 Function TTUtcOffsetMin()
-    Dim sh, bias
+    Dim v
     TTUtcOffsetMin = Empty
     If CStr(TT_UtcOffsetMin) <> "" Then
         If IsNumeric(TT_UtcOffsetMin) Then TTUtcOffsetMin = CLng(TT_UtcOffsetMin)
         Exit Function
     End If
+    v = TTOffsetFromRegistry()
+    If IsEmpty(v) Then v = TTOffsetFromWmi()
+    TTUtcOffsetMin = v
+End Function
+
+Function TTOffsetFromRegistry()
+    Dim sh, bias
+    TTOffsetFromRegistry = Empty
     bias = Empty
     On Error Resume Next
     Set sh = CreateObject("WScript.Shell")
@@ -2087,12 +2095,29 @@ Function TTUtcOffsetMin()
     On Error GoTo 0
     ' IsNumeric(Empty) is True in VBScript, so a failed read must be ruled out first.
     If IsEmpty(bias) Then Exit Function
-    If IsNumeric(bias) Then
-        bias = CDbl(bias)
-        ' A REG_DWORD can come back unsigned.
-        If bias > 2147483647 Then bias = bias - 4294967296
-        TTUtcOffsetMin = -CLng(bias)
-    End If
+    If Not IsNumeric(bias) Then Exit Function
+    bias = CDbl(bias)
+    ' A REG_DWORD can come back unsigned.
+    If bias > 2147483647 Then bias = bias - 4294967296
+    TTOffsetFromRegistry = -CLng(bias)
+End Function
+
+Function TTOffsetFromWmi()
+    Dim wmi, rows, row, m
+    TTOffsetFromWmi = Empty
+    m = Empty
+    On Error Resume Next
+    Set wmi = GetObject("winmgmts:\\.\root\cimv2")
+    Set rows = wmi.ExecQuery("SELECT CurrentTimeZone FROM Win32_OperatingSystem")
+    For Each row In rows
+        m = row.CurrentTimeZone
+    Next
+    Err.Clear
+    On Error GoTo 0
+    If IsEmpty(m) Then Exit Function
+    If IsNull(m) Then Exit Function
+    If Not IsNumeric(m) Then Exit Function
+    TTOffsetFromWmi = CLng(m)
 End Function
 
 ' +11:00 / -03:30 / +00:00, or "" if the offset is unknown.

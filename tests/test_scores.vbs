@@ -132,6 +132,8 @@ Sub Test_UtcOffsetSetting()
     AssertTrue IsEmpty(TTUtcOffsetMin()), "a bad setting is unknown, not a guess"
     TT_UtcOffsetMin = ""
     AssertTrue Not IsEmpty(TTUtcOffsetMin()), "read from Windows"
+    AssertTrue Not IsEmpty(TTOffsetFromWmi()), "WMI fallback works"
+    If IsEmpty(TTOffsetFromRegistry()) Then WScript.Echo "note: ActiveTimeBias not readable here; WMI used"
 End Sub
 
 Sub Test_JsonFrac()
