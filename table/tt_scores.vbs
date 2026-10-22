@@ -187,6 +187,39 @@ Function TTHighScoresJson()
                        ",""scores"":[" & rows & vbCrLf & "]}" & vbCrLf
 End Function
 
+' ---------------------------------------------------------------- backglass page state
+
+' ThreatTide_state.js tells backglass/index.html what the table is doing, so
+' it can show the art while someone plays and the ad loop when nobody does.
+Dim TTStateSeq : TTStateSeq = 0
+Dim TTStateKey : TTStateKey = ""
+
+Function TTStateJs(mode, g)
+    TTStateJs = "window.TT_STATE = {""seq"":" & TTStateSeq & _
+                ",""mode"":" & TTJsonStr(mode) & _
+                ",""ts"":" & TTJsonStr(TTIsoNow()) & _
+                ",""score"":" & TTDigits(g.Score) & _
+                ",""score_text"":" & TTJsonStr(TTMoney(g.Score)) & _
+                ",""ball"":" & g.BallNum & _
+                ",""balls"":" & g.BallsPerGame & "};" & vbCrLf
+End Function
+
+' Writes only when something changed. Never lets a disk error stop play.
+Sub TTWriteState(mode, g)
+    Dim key, fso, f
+    key = mode & "|" & TTDigits(g.Score) & "|" & g.BallNum
+    If key = TTStateKey Then Exit Sub
+    TTStateKey = key
+    TTStateSeq = TTStateSeq + 1
+    On Error Resume Next
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Set f = fso.CreateTextFile(TTDataPath("ThreatTide_state.js"), True)
+    f.Write TTStateJs(mode, g)
+    f.Close
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 ' Data for leaderboard/index.html. A .js file (not .json) so the page can load
 ' it straight from disk with a <script> tag: no web server needed.
 Function TTLeaderboardJs(gameJson)

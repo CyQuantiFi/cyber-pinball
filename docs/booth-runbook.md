@@ -33,13 +33,32 @@ Add a collection notice above the submit button (see Privacy below) and a link t
 
 ## Installing on the cabinet
 
-Needs Visual Pinball X 10.8, FlexDMD and the B2S Backglass Server installed (standard on a virtual pinball cabinet).
+Needs Visual Pinball X 10.8, FlexDMD, and Chrome or Edge (standard on a virtual pinball cabinet). The B2S Backglass Server is only needed if you switch the back screen to the static image (`TT_BackglassMode = "b2s"`).
 
-1. Download the **ThreatTide-table** artifact from the latest green CI run (Actions tab), or run `bash tools/build_all.sh`.
-2. Copy `ThreatTide.vpx` and `ThreatTide.directb2s` into VPX's `Tables` folder, side by side.
+1. Download the **ThreatTide-table** artifact from the latest green CI run (Actions tab), or run `bash tools/build_all.sh`. Copy this whole repo to the cabinet too (e.g. `C:\ThreatTide\`): the back screen, leaderboard and launchers run from it.
+2. Copy `ThreatTide.vpx` (and `ThreatTide.directb2s`, used only in `b2s` mode) into VPX's `Tables` folder.
 3. Copy the repo's `dmd\` folder to `Tables\ThreatTide\` (the Comfortaa DMD fonts). Without it the DMD uses pixel fonts.
 4. Copy the music (below).
-5. Launch the table. If any objects are missing, the DMD lists them for 20 seconds.
+5. Set the paths at the top of `start_booth.bat`, `backglass\start_backglass.bat` and (if used) `leaderboard\start_leaderboard.bat`, then start everything with `start_booth.bat`. If any table objects are missing, the DMD lists them for 20 seconds.
+
+## Back screen: idle ad loop
+
+The back screen is a browser page (`backglass/index.html`) that follows the table:
+
+| Table is… | Back screen shows |
+| --- | --- |
+| Being played (game, board report, initials, QR) | Backglass art with ball number and live $ score |
+| In attract mode for 60 s, or not running at all | Ad loop: your videos (or the built-in CyQuantiFi promo) → today's leaderboard (20 s) → repeat |
+
+Pressing Start brings the art back within about a second.
+
+**Your ad videos:** copy them into `backglass\media\`, copy `playlist.example.js` to `playlist.js` there and list the files. MP4 (H.264) works best. With no playlist the built-in promo plays (5 animated slides, 30 s: Threat Tide, $ counter, tagline, today's top score, QR code). The same promo is exported as `promo.mp4` (1920×1080) in the CI artifact, for socials or other booth screens. Videos play muted; add `&sound=1` to the page URL in `start_backglass.bat` for sound (it will mix with the table's music).
+
+**Settings** (in `start_backglass.bat`): `SCREEN_POS` (where the back screen starts in Windows display settings), `IDLE_SECS`, `DATA_DIR` (same as `TT_DataDir`). A video that won't play is skipped after 8 s, so a bad file never freezes the screen.
+
+**Start order matters:** the browser must open *before* Visual Pinball, or VPX loses keyboard focus and the flippers won't respond. `start_booth.bat` does this; if you start things by hand and the flippers are dead, click the playfield once.
+
+**Preview:** kiosk mode has no developer tools, so preview on a laptop instead: open `backglass/index.html?idle=5` in Chrome. To watch the promo alone: `?promo=1`.
 
 ## Music (one-time cabinet setup)
 

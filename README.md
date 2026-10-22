@@ -22,6 +22,8 @@ All dollar values are game-design numbers for fun. They are not CyQuantiFi model
 | `dmd/` | Comfortaa bitmap fonts for FlexDMD. |
 | `sound/sfx/` | Game-cue sound effects, synthesized by `tools/make_sfx.py` (original, no licence to track). |
 | `leaderboard/` | Live leaderboard page for the booth's second screen. Runs from disk, no server or internet. |
+| `backglass/` | Browser backglass for the cabinet's back screen: art + live score while playing, ad video / promo + leaderboard when idle. |
+| `start_booth.bat` | Starts the back screen, leaderboard and table in the right order. |
 | `docs/` | Object contract, author brief, tuning guide, acceptance tests, booth runbook, licences. |
 
 **The playable table is built from this repo.** `tools/build_table.py` takes VPX's own blank table (the File > New template: cabinet, flippers, plunger lane, slings, apron), adds the Threat Tide shots from [`tools/table_layout.py`](tools/table_layout.py), the playfield and backglass art, sounds and the script, and writes `dist/ThreatTide.vpx` plus `dist/ThreatTide.directb2s`. CI builds both on every push: download them from the **ThreatTide-table** artifact on the Actions run. A table author then plays it on Windows and tunes the physics and art ([`docs/author-brief.md`](docs/author-brief.md)). Install steps: [`docs/booth-runbook.md`](docs/booth-runbook.md#installing-on-the-cabinet).

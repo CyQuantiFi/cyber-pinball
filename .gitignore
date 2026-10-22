@@ -14,3 +14,8 @@ music/
 build/
 dist/ThreatTide.vpx
 dist/*.directb2s
+# Ad videos and the cabinet's playlist stay on the cabinet
+backglass/media/*.mp4
+backglass/media/*.webm
+backglass/media/playlist.js
+dist/promo.mp4

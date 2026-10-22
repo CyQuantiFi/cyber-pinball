@@ -98,7 +98,9 @@ Dim TT_PatchTuesdayOn : TT_PatchTuesdayOn = True
 Dim TT_VolumePreset : TT_VolumePreset = "booth"   ' "booth" (loud hall) or "quiet"
 Dim TT_ContestMode : TT_ContestMode = True        ' High scores reset each day
 Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
-Dim TT_UseB2S : TT_UseB2S = True                  ' Show ThreatTide.directb2s on the backglass screen
+' Back screen: "page" = browser backglass (backglass/index.html: art while
+' playing, ad video + leaderboard when idle); "b2s" = static ThreatTide.directb2s
+Dim TT_BackglassMode : TT_BackglassMode = "page"
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
 ' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----

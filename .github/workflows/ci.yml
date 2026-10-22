@@ -60,3 +60,24 @@ jobs:
             dist/ThreatTide.vpx
             dist/ThreatTide.directb2s
             dmd/
+
+  promo:
+    # Renders the built-in back-screen promo loop to promo.mp4 (1920x1080, 30 s)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Playwright, Chromium and ffmpeg
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
+      - name: Render promo
+        run: node tools/render_promo.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ThreatTide-promo
+          path: dist/promo.mp4

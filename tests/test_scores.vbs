@@ -7,6 +7,7 @@ Sub RunScoresTests()
     RunTest "Test_HighScoreLine"
     RunTest "Test_GameJson"
     RunTest "Test_JsonEscaping"
+    RunTest "Test_BackglassStateJs"
 End Sub
 
 Sub T_FreshTable()
@@ -73,4 +74,15 @@ End Sub
 
 Sub Test_JsonEscaping()
     AssertEq TTJsonStr("a""b\c"), """a\""b\\c""", "quotes and backslashes"
+End Sub
+
+Sub Test_BackglassStateJs()
+    Dim g, j : Set g = NewGame()
+    PlayPath g, 20000
+    j = TTStateJs("game", g)
+    AssertTrue Left(j, 18) = "window.TT_STATE = ", "assigns the page's global"
+    AssertTrue InStr(j, """mode"":""game""") > 0, "mode"
+    AssertTrue InStr(j, """score"":1230000,") > 0, "score as plain number"
+    AssertTrue InStr(j, """score_text"":""$1,230,000""") > 0, "score as display text"
+    AssertTrue InStr(j, """ball"":1,""balls"":3}") > 0, "ball and balls per game"
 End Sub

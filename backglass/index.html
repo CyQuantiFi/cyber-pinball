@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threat Tide Backglass</title>
+<!--
+  Threat Tide browser backglass, for the cabinet's back screen.
+
+  While someone plays: the backglass art with the live score.
+  When the table has sat in attract mode for a minute (or isn't running):
+  an ad loop. Your MP4s from media/playlist.js, or the built-in CyQuantiFi
+  promo if there are none, alternating with today's leaderboard.
+
+  The table writes ThreatTide_state.js (TT_BackglassMode = "page"); this page
+  reads it every second with a <script> tag, so it runs from disk with no
+  server and no internet. Launch with start_backglass.bat.
+
+  URL options:
+    data=<folder URL>   where the table writes its files (TT_DataDir), e.g.
+                        file:///C:/ThreatTide/data/   default: this folder
+    idle=60             seconds in attract before the ad loop starts
+    board=20            seconds the leaderboard shows per loop
+    sound=1             play video sound (needs the launcher's autoplay flag)
+    promo=1             show only the promo loop (preview / recording)
+-->
+<style>
+  @font-face {
+    font-family: "Comfortaa";
+    src: url("../art/fonts/Comfortaa-VariableFont_wght.ttf") format("truetype");
+    font-weight: 300 700;
+  }
+  :root {
+    --bg: #1A1B1C;
+    --orange: #FF8818;
+    --pink: #FF9AA3;
+    --text: #F4F4F4;
+    --muted: #9A9EA3;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { font-family: Comfortaa, "Segoe UI", system-ui, sans-serif; color: var(--text); cursor: none; }
+  .layer { position: fixed; inset: 0; transition: opacity .6s ease; }
+  .hidden { opacity: 0; pointer-events: none; }
+
+  /* ---------- playing: art + live score ---------- */
+  #art { background: var(--bg); display: grid; place-items: center; }
+  #art img { width: 100%; height: 100%; object-fit: contain; }
+  #strip {
+    position: fixed; left: 50%; top: 3vh; transform: translateX(-50%);
+    display: flex; gap: 3vw; align-items: baseline; white-space: nowrap;
+    padding: 1.2vh 3vw; border-radius: 99px;
+    background: rgba(26, 27, 28, .82); border: 1px solid rgba(255, 136, 24, .5);
+  }
+  #strip .ball { font-size: 3.2vh; color: var(--muted); letter-spacing: .1em; }
+  #strip .score { font-size: 6vh; font-weight: 700; color: var(--orange); font-variant-numeric: tabular-nums; }
+  #strip .msg { font-size: 3.2vh; color: var(--pink); }
+
+  /* ---------- idle: video ---------- */
+  #video { background: #000; }
+  #video video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+
+  /* ---------- idle: leaderboard ---------- */
+  #board iframe { width: 100%; height: 100%; border: 0; background: var(--bg); }
+
+  /* ---------- idle: promo ---------- */
+  #promo { background: radial-gradient(ellipse 80% 55% at 50% 38%, #2a1a0c 0%, var(--bg) 55%, #0d1620 100%); }
+  #promo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .slide {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 6vh 7vw; gap: 2.4vh; opacity: 0;
+  }
+  .big { font-size: min(15vh, 11vw); font-weight: 700; color: var(--orange); letter-spacing: .08em; line-height: 1; }
+  .money { font-size: min(14vh, 10vw); font-weight: 700; color: var(--orange); font-variant-numeric: tabular-nums; line-height: 1; }
+  .h1 { font-size: min(8.5vh, 6vw); font-weight: 700; line-height: 1.15; max-width: 22ch; }
+  .h2 { font-size: min(4.6vh, 3.4vw); color: var(--text); line-height: 1.35; max-width: 34ch; }
+  .pink { color: var(--pink); }
+  .orange { color: var(--orange); }
+  .small { font-size: min(2.6vh, 2vw); color: var(--muted); letter-spacing: .06em; }
+  .chain { display: flex; gap: 1.6vw; margin-top: 1vh; }
+  .chain span {
+    width: min(5vh, 4vw); height: min(5vh, 4vw); border-radius: 50%; display: grid; place-items: center;
+    border: .35vh solid var(--orange); color: var(--orange); font-weight: 700; font-size: min(2.4vh, 1.8vw);
+  }
+  .chain span.on { background: var(--orange); color: var(--bg); }
+  .qrrow { display: flex; align-items: center; gap: 4vw; }
+  .qrrow img { height: min(34vh, 26vw); image-rendering: pixelated; border-radius: 1vh; background: #fff; padding: 1vh; }
+  .qrrow .h1 { text-align: left; max-width: 16ch; }
+  #brand {
+    position: absolute; right: 3vw; bottom: 3vh; font-size: min(3vh, 2.2vw); font-weight: 700;
+    letter-spacing: .05em; color: var(--text); opacity: .85;
+  }
+  #brand b { color: var(--orange); }
+  #attrib { position: absolute; left: 3vw; bottom: 3vh; font-size: min(1.8vh, 1.4vw); color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="layer" id="art"><img src="../art/render/backglass.png" alt=""></div>
+<div id="strip" class="hidden"><span class="ball"></span><span class="score"></span><span class="msg"></span></div>
+
+<div class="layer hidden" id="video"><video muted playsinline></video></div>
+<div class="layer hidden" id="board"><iframe title="Leaderboard"></iframe></div>
+<div class="layer hidden" id="promo">
+  <canvas id="waves"></canvas>
+  <div class="slide" data-i="0">
+    <div class="big">THREAT TIDE</div>
+    <div class="h2">You're the attacker.<br>Your score is <span class="orange">realised loss</span>.</div>
+    <div class="small">A CYQUANTIFI PINBALL TABLE</div>
+  </div>
+  <div class="slide" data-i="1">
+    <div class="money" id="counter">$0</div>
+    <div class="h2">One attack path. Seven techniques.<br><span class="pink">Your worst day.</span></div>
+    <div class="chain" id="chain"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span></div>
+  </div>
+  <div class="slide" data-i="2">
+    <div class="h1">Put a <span class="orange">dollar figure</span> on every cyber risk.</div>
+    <div class="h2">Including the systems you can't scan.</div>
+  </div>
+  <div class="slide" data-i="3">
+    <div class="h2" id="todayLabel">Today's biggest loss</div>
+    <div class="money" id="todayTop">$0</div>
+    <div class="h2">Think you can do more damage?<br><span class="orange">Press START.</span></div>
+  </div>
+  <div class="slide" data-i="4">
+    <div class="qrrow">
+      <img src="../art/render/qr_form.png" alt="QR code">
+      <div class="h1">Want this number for your <span class="orange">real environment?</span></div>
+    </div>
+    <div class="h2 pink">Ask us at the booth.</div>
+  </div>
+  <div id="attrib">Technique names from MITRE ATT&amp;CK&reg;. Dollar values are game-design numbers, not loss estimates.</div>
+  <div id="brand">Cy<b>Quanti</b>Fi</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var q = new URLSearchParams(location.search);
+  var DATA = q.get("data") || "";
+  if (DATA && !/\/$/.test(DATA)) DATA += "/";
+  var IDLE_MS = (+q.get("idle") || 60) * 1000;
+  var BOARD_MS = (+q.get("board") || 20) * 1000;
+  var PROMO_ONLY = q.get("promo") === "1";
+  var STALE_MS = 10 * 60 * 1000;          // a "game" state this old means the table was closed
+  var PROMO_LEN = 30;                     // seconds: 5 slides x 6 s
+
+  var $ = function (id) { return document.getElementById(id); };
+  var layers = { art: $("art"), video: $("video"), board: $("board"), promo: $("promo") };
+  var videoEl = document.querySelector("#video video");
+  if (q.get("sound") === "1") videoEl.muted = false;
+
+  function show(name) {
+    Object.keys(layers).forEach(function (k) { layers[k].classList.toggle("hidden", k !== name); });
+    $("strip").classList.toggle("hidden", name !== "art" || !strip.visible);
+  }
+
+  // ---------------------------------------------------------------- money (same rules as the table)
+  function money(v) {
+    v = Math.max(0, Math.round(Number(v) || 0));
+    function oneDec(unit) {
+      var tenths = Math.round(v / (unit / 10));
+      return Math.floor(tenths / 10).toLocaleString("en-US") + "." + (tenths % 10);
+    }
+    if (v >= 1e9) return "$" + oneDec(1e9) + "B";
+    if (v >= 1e7) return "$" + oneDec(1e6) + "M";
+    return "$" + v.toLocaleString("en-US");
+  }
+
+  // ---------------------------------------------------------------- data files via <script> tags
+  function loadScript(id, url, done) {
+    var old = document.getElementById(id);
+    if (old) old.remove();
+    var s = document.createElement("script");
+    s.id = id;
+    s.src = url + (url.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now();
+    s.onload = function () { done(true); };
+    s.onerror = function () { done(false); };
+    document.head.appendChild(s);
+  }
+
+  // ---------------------------------------------------------------- table state
+  var state = null;            // last TT_STATE
+  var attractSince = Date.now();
+  var lastSeq = null;
+
+  function idleNow() {
+    if (PROMO_ONLY) return true;
+    if (!state) return Date.now() - attractSince > IDLE_MS;   // table not running
+    var age = Date.now() - Date.parse(state.ts);
+    if (state.mode !== "attract" && age > STALE_MS) return true;
+    return state.mode === "attract" && Date.now() - attractSince > IDLE_MS;
+  }
+
+  var strip = { visible: false };
+  function renderStrip() {
+    var s = state;
+    var ball = $("strip").querySelector(".ball"), score = $("strip").querySelector(".score"), msg = $("strip").querySelector(".msg");
+    strip.visible = false;
+    if (!s || s.mode === "attract") return;
+    strip.visible = true;
+    if (s.mode === "game") {
+      ball.textContent = "BALL " + s.ball + " OF " + s.balls;
+      score.textContent = s.score_text || money(s.score);
+      msg.textContent = "";
+    } else if (s.mode === "gameover_wait" || s.mode === "report") {
+      ball.textContent = "REALISED LOSS";
+      score.textContent = s.score_text || money(s.score);
+      msg.textContent = "Board report below";
+    } else if (s.mode === "initials") {
+      ball.textContent = "";
+      score.textContent = s.score_text || money(s.score);
+      msg.textContent = "Enter your initials";
+    } else if (s.mode === "claim") {
+      ball.textContent = "";
+      score.textContent = s.score_text || money(s.score);
+      msg.textContent = "Scan the QR to enter today's contest";
+    }
+  }
+
+  function pollState() {
+    if (PROMO_ONLY) return;
+    loadScript("tt-state", DATA + "ThreatTide_state.js", function (ok) {
+      var s = ok ? window.TT_STATE : null;
+      if (s && s.seq !== lastSeq) {
+        var wasAttract = state && state.mode === "attract";
+        lastSeq = s.seq;
+        state = s;
+        if (s.mode === "attract" && !wasAttract) attractSince = Date.now();
+      }
+      renderStrip();
+      tick();
+    });
+  }
+
+  // ---------------------------------------------------------------- idle loop
+  var playlist = [];            // video URLs from media/playlist.js
+  var loop = { active: false, step: 0, until: 0, kind: "" };
+  var boardData = null;
+
+  function steps() {
+    var list = playlist.length ? playlist.map(function (u) { return { kind: "video", src: u }; })
+                               : [{ kind: "promo" }];
+    if (!PROMO_ONLY) list.push({ kind: "board" });
+    return list;
+  }
+
+  function startStep(i) {
+    var list = steps();
+    loop.step = i % list.length;
+    var item = list[loop.step];
+    loop.kind = item.kind;
+    if (item.kind === "video") {
+      videoEl.src = item.src;
+      watch = { t: -1, since: Date.now() };
+      var token = ++playToken;
+      var p = videoEl.play();
+      // only skip if this same video is still the current step (an aborted play rejects late)
+      if (p && p.catch) p.catch(function () { if (token === playToken && loop.kind === "video") nextStep(); });
+      loop.until = Infinity;           // ends on 'ended'
+      show("video");
+    } else if (item.kind === "promo") {
+      promoStart = performance.now();
+      loop.until = Date.now() + PROMO_LEN * 1000;
+      show("promo");
+    } else {
+      var f = $("board").querySelector("iframe");
+      var src = "../leaderboard/index.html?data=" + encodeURIComponent(DATA + "ThreatTide_leaderboard.js");
+      if (f.getAttribute("src") !== src) f.setAttribute("src", src);
+      loop.until = Date.now() + BOARD_MS;
+      show("board");
+    }
+  }
+  function nextStep() {
+    if (loop.kind === "video") stopVideo();
+    startStep(loop.step + 1);
+  }
+
+  var playToken = 0;
+
+  // Stall watchdog: skip a video whose position hasn't moved for 8 s
+  var watch = { t: -1, since: 0 };
+  function stalled() {
+    if (videoEl.currentTime !== watch.t) {
+      watch = { t: videoEl.currentTime, since: Date.now() };
+      return false;
+    }
+    return Date.now() - watch.since > 8000;
+  }
+  function stopVideo() {
+    playToken++;
+    videoEl.pause();
+    videoEl.removeAttribute("src");
+    videoEl.load();
+  }
+  videoEl.addEventListener("ended", function () { if (loop.active && loop.kind === "video") nextStep(); });
+  videoEl.addEventListener("error", function () {
+    if (loop.active && loop.kind === "video" && videoEl.getAttribute("src")) nextStep();
+  });
+
+  function tick() {
+    var idle = idleNow();
+    if (idle && !loop.active) {
+      loop.active = true;
+      refreshBoardData();
+      startStep(0);
+    } else if (!idle && loop.active) {
+      loop.active = false;
+      stopVideo();
+      show("art");
+    } else if (loop.active && loop.kind === "video" && stalled()) {
+      nextStep();                       // a broken or stuck file never freezes the screen
+    } else if (loop.active && Date.now() >= loop.until) {
+      if (loop.kind === "promo") refreshBoardData();
+      nextStep();
+    } else if (!loop.active) {
+      show("art");
+    }
+  }
+
+  // ---------------------------------------------------------------- promo (deterministic in t)
+  var promoStart = performance.now();
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var canvas = $("waves"), ctx = canvas.getContext("2d");
+  var TOP_DEMO = 4930000;
+
+  function ease(x) { return x < 0 ? 0 : x > 1 ? 1 : 1 - Math.pow(1 - x, 3); }
+
+  function drawWaves(t) {
+    var w = canvas.width = canvas.clientWidth, h = canvas.height = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    for (var k = 0; k < 9; k++) {
+      var y0 = h * (0.62 + k * 0.05);
+      ctx.beginPath();
+      for (var x = 0; x <= w; x += 8) {
+        var y = y0 + Math.sin(x / (w / (2.2 + k * 0.3)) * Math.PI * 2 + t * (0.5 + k * 0.07) + k) * h * 0.012
+                   + Math.sin(x / (w / 5.1) * Math.PI * 2 - t * 0.8 + k * 1.7) * h * 0.005;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = "rgba(44, 68, 88," + (0.55 - k * 0.05) + ")";
+      ctx.lineWidth = Math.max(1, h * 0.003);
+      ctx.stroke();
+    }
+    for (var s = 0; s < 5; s++) {       // storm lines up top
+      var ys = h * (0.08 + s * 0.045);
+      ctx.beginPath();
+      for (var x2 = 0; x2 <= w; x2 += 8) {
+        var yy = ys + Math.sin(x2 / (w / (1.6 + s * 0.4)) * Math.PI * 2 - t * (0.35 + s * 0.05) + s * 2) * h * 0.02;
+        x2 === 0 ? ctx.moveTo(x2, yy) : ctx.lineTo(x2, yy);
+      }
+      ctx.strokeStyle = s % 2 ? "rgba(255,154,163,0.16)" : "rgba(255,136,24,0.18)";
+      ctx.lineWidth = Math.max(1, h * 0.0025);
+      ctx.stroke();
+    }
+  }
+
+  // Render the promo at time t (seconds). Used live and by tools/render_promo.js.
+  window.promoRender = function (t) {
+    t = ((t % PROMO_LEN) + PROMO_LEN) % PROMO_LEN;
+    drawWaves(t);
+    var i = Math.floor(t / 6), local = t - i * 6;
+    slides.forEach(function (el, n) {
+      if (n !== i) { el.style.opacity = 0; return; }
+      var a = Math.min(ease(local / 0.7), ease((6 - local) / 0.6));
+      el.style.opacity = a;
+      el.style.transform = "translateY(" + ((1 - ease(local / 0.9)) * 3) + "vh)";
+    });
+    if (i === 1) {
+      var p = ease((local - 0.4) / 3.2);
+      $("counter").textContent = money(TOP_DEMO * p);
+      var dots = $("chain").children;
+      for (var d = 0; d < dots.length; d++) dots[d].classList.toggle("on", local > 0.6 + d * 0.45);
+    }
+  };
+
+  function refreshBoardData() {
+    if (PROMO_ONLY || q.get("export") === "1") return applyBoard(null);
+    loadScript("tt-board", DATA + "ThreatTide_leaderboard.js", function (ok) {
+      applyBoard(ok ? window.TT_LEADERBOARD : null);
+    });
+  }
+  function applyBoard(data) {
+    boardData = data;
+    var d = new Date();
+    var today = d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+    var top = data && data.board && data.board.day === today && data.board.scores && data.board.scores[0];
+    if (q.get("export") === "1") {
+      $("todayLabel").textContent = "Today's biggest loss could be yours";
+      $("todayTop").textContent = "$?,???,???";
+    } else if (top) {
+      $("todayLabel").textContent = "Today's biggest loss · " + top.initials;
+      $("todayTop").textContent = money(top.score);
+    } else {
+      $("todayLabel").textContent = "Today's biggest loss";
+      $("todayTop").textContent = "Still $0";
+    }
+  }
+
+  function frame() {
+    if (loop.active && loop.kind === "promo" && q.get("export") !== "1") {
+      window.promoRender((performance.now() - promoStart) / 1000);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // Debug view for tests and on-site checks: window.ttDebug()
+  window.ttDebug = function () {
+    return { mode: state && state.mode, seq: lastSeq, idle: idleNow(), loop: loop.active, kind: loop.kind,
+             step: loop.step, playlist: playlist, video: { paused: videoEl.paused, err: videoEl.error && videoEl.error.code, t: videoEl.currentTime, ready: videoEl.readyState, net: videoEl.networkState }, watch: watch, until: loop.until };
+  };
+
+  // ---------------------------------------------------------------- start
+  loadScript("tt-playlist", "media/playlist.js", function (ok) {
+    playlist = ok && Array.isArray(window.TT_PLAYLIST) ? window.TT_PLAYLIST.filter(Boolean) : [];
+    applyBoard(null);
+    show("art");
+    pollState();
+    setInterval(pollState, 1000);
+    if (PROMO_ONLY) tick();
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>

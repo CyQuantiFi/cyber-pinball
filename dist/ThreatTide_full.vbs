@@ -107,7 +107,9 @@ Dim TT_PatchTuesdayOn : TT_PatchTuesdayOn = True
 Dim TT_VolumePreset : TT_VolumePreset = "booth"   ' "booth" (loud hall) or "quiet"
 Dim TT_ContestMode : TT_ContestMode = True        ' High scores reset each day
 Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
-Dim TT_UseB2S : TT_UseB2S = True                  ' Show ThreatTide.directb2s on the backglass screen
+' Back screen: "page" = browser backglass (backglass/index.html: art while
+' playing, ad video + leaderboard when idle); "b2s" = static ThreatTide.directb2s
+Dim TT_BackglassMode : TT_BackglassMode = "page"
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
 
 ' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----
@@ -1931,6 +1933,39 @@ Function TTHighScoresJson()
                        ",""scores"":[" & rows & vbCrLf & "]}" & vbCrLf
 End Function
 
+' ---------------------------------------------------------------- backglass page state
+
+' ThreatTide_state.js tells backglass/index.html what the table is doing, so
+' it can show the art while someone plays and the ad loop when nobody does.
+Dim TTStateSeq : TTStateSeq = 0
+Dim TTStateKey : TTStateKey = ""
+
+Function TTStateJs(mode, g)
+    TTStateJs = "window.TT_STATE = {""seq"":" & TTStateSeq & _
+                ",""mode"":" & TTJsonStr(mode) & _
+                ",""ts"":" & TTJsonStr(TTIsoNow()) & _
+                ",""score"":" & TTDigits(g.Score) & _
+                ",""score_text"":" & TTJsonStr(TTMoney(g.Score)) & _
+                ",""ball"":" & g.BallNum & _
+                ",""balls"":" & g.BallsPerGame & "};" & vbCrLf
+End Function
+
+' Writes only when something changed. Never lets a disk error stop play.
+Sub TTWriteState(mode, g)
+    Dim key, fso, f
+    key = mode & "|" & TTDigits(g.Score) & "|" & g.BallNum
+    If key = TTStateKey Then Exit Sub
+    TTStateKey = key
+    TTStateSeq = TTStateSeq + 1
+    On Error Resume Next
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Set f = fso.CreateTextFile(TTDataPath("ThreatTide_state.js"), True)
+    f.Write TTStateJs(mode, g)
+    f.Close
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 ' Data for leaderboard/index.html. A .js file (not .json) so the page can load
 ' it straight from disk with a <script> tag: no web server needed.
 Function TTLeaderboardJs(gameJson)
@@ -1979,6 +2014,7 @@ Dim TTStageLightNames, TTStageLights(6), TTStageLightState(6)
 Dim TTLockHold              ' set when the rules lock the ball sitting in kImpact
 Dim TTTaskSeq               ' makes repeatable task names unique
 Dim TTGateOpen              ' last Air Gap gate state applied
+Dim TTNextStateMs           ' next backglass-page state write during play
 
 ' Startup check reports any of these that are missing.
 Function TTRequiredObjects()
@@ -2067,6 +2103,10 @@ Sub tmrTick_Timer()
             TTG.Tick t
             TTUpdateLights
             TTDisplayUpdate TTG, t
+            If t >= TTNextStateMs Then
+                TTNextStateMs = t + 1000
+                TTWriteState TTMode, TTG
+            End If
         Case "attract"
             If t >= TTNextAttractMs Then
                 TTAttractPage = (TTAttractPage + 1) Mod 5
@@ -2190,7 +2230,7 @@ End Function
 Dim TTB2S
 Sub TTBackglassStart()
     Set TTB2S = Nothing
-    If Not TT_UseB2S Then Exit Sub
+    If TT_BackglassMode <> "b2s" Then Exit Sub     ' the browser page owns the back screen
     On Error Resume Next
     Set TTB2S = CreateObject("B2S.Server")
     If Err.Number <> 0 Then
@@ -2370,6 +2410,7 @@ Sub TTEmit(kind, a, b)
             TTMusic TT_MusicTheme
         Case "gameover"
             TTMode = "gameover_wait"
+            TTWriteState TTMode, TTG
             TTPlay "gameover"
             TTSchedule "report", 4000
     End Select
@@ -2384,6 +2425,7 @@ Sub TTStartGame()
     TTDisplayStartGame
     TTMusic TT_MusicTheme
     TTG.StartGame GameTime
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTEnterAttract()
@@ -2393,6 +2435,7 @@ Sub TTEnterAttract()
     TTScoresCheckDay
     TTDisplayAttract 0
     TTMusic ""
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTEnterReport()
@@ -2401,6 +2444,7 @@ Sub TTEnterReport()
     TTAllLightsOff
     TTDisplayReport TTG
     TTSchedule "report_done", TT_REPORT_MS
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTEnterInitials()
@@ -2409,6 +2453,7 @@ Sub TTEnterInitials()
     TTInitialPos = 0
     TTShowInitials
     TTSchedule "initials_timeout", TT_INITIALS_TIMEOUT_MS
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTShowInitials()
@@ -2470,6 +2515,7 @@ Sub TTFinishInitials()
     TTMode = "claim"
     TTDisplayClaim TTLastInitials, TTG.Score
     TTSchedule "claim_done", TT_CLAIM_MS
+    TTWriteState TTMode, TTG
 End Sub
 
 ' ---------------------------------------------------------------- tasks

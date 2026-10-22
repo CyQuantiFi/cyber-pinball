@@ -17,6 +17,7 @@ Dim TTStageLightNames, TTStageLights(6), TTStageLightState(6)
 Dim TTLockHold              ' set when the rules lock the ball sitting in kImpact
 Dim TTTaskSeq               ' makes repeatable task names unique
 Dim TTGateOpen              ' last Air Gap gate state applied
+Dim TTNextStateMs           ' next backglass-page state write during play
 
 ' Startup check reports any of these that are missing.
 Function TTRequiredObjects()
@@ -105,6 +106,10 @@ Sub tmrTick_Timer()
             TTG.Tick t
             TTUpdateLights
             TTDisplayUpdate TTG, t
+            If t >= TTNextStateMs Then
+                TTNextStateMs = t + 1000
+                TTWriteState TTMode, TTG
+            End If
         Case "attract"
             If t >= TTNextAttractMs Then
                 TTAttractPage = (TTAttractPage + 1) Mod 5
@@ -228,7 +233,7 @@ End Function
 Dim TTB2S
 Sub TTBackglassStart()
     Set TTB2S = Nothing
-    If Not TT_UseB2S Then Exit Sub
+    If TT_BackglassMode <> "b2s" Then Exit Sub     ' the browser page owns the back screen
     On Error Resume Next
     Set TTB2S = CreateObject("B2S.Server")
     If Err.Number <> 0 Then
@@ -408,6 +413,7 @@ Sub TTEmit(kind, a, b)
             TTMusic TT_MusicTheme
         Case "gameover"
             TTMode = "gameover_wait"
+            TTWriteState TTMode, TTG
             TTPlay "gameover"
             TTSchedule "report", 4000
     End Select
@@ -422,6 +428,7 @@ Sub TTStartGame()
     TTDisplayStartGame
     TTMusic TT_MusicTheme
     TTG.StartGame GameTime
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTEnterAttract()
@@ -431,6 +438,7 @@ Sub TTEnterAttract()
     TTScoresCheckDay
     TTDisplayAttract 0
     TTMusic ""
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTEnterReport()
@@ -439,6 +447,7 @@ Sub TTEnterReport()
     TTAllLightsOff
     TTDisplayReport TTG
     TTSchedule "report_done", TT_REPORT_MS
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTEnterInitials()
@@ -447,6 +456,7 @@ Sub TTEnterInitials()
     TTInitialPos = 0
     TTShowInitials
     TTSchedule "initials_timeout", TT_INITIALS_TIMEOUT_MS
+    TTWriteState TTMode, TTG
 End Sub
 
 Sub TTShowInitials()
@@ -508,6 +518,7 @@ Sub TTFinishInitials()
     TTMode = "claim"
     TTDisplayClaim TTLastInitials, TTG.Score
     TTSchedule "claim_done", TT_CLAIM_MS
+    TTWriteState TTMode, TTG
 End Sub
 
 ' ---------------------------------------------------------------- tasks

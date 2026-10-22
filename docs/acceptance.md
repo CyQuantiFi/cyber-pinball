@@ -73,3 +73,13 @@ Run these on the booth cabinet (or an identical setup). Tick each box and note t
 - [ ] Leaderboard updates within 10 s of initials entry (it checks every 3 s).
 - [ ] The new entry is highlighted and the "Latest attack" panel shows the costliest Path with technique names.
 - [ ] After midnight with contest mode on, the board shows "No losses yet today" until the first game.
+
+## Back screen ad loop
+
+- [ ] `start_booth.bat` opens the back screen, then VPX; the flippers work without clicking.
+- [ ] While playing, the back screen shows the art with the ball number and live $ score; the MITRE ATT&CK attribution stays visible.
+- [ ] After 60 s in attract mode the ad loop starts: video (or promo) → leaderboard → repeat.
+- [ ] Pressing Start returns to the art within about a second, with the video stopped.
+- [ ] With VPX closed, the back screen keeps looping the ads.
+- [ ] A deliberately broken video file is skipped within 10 s.
+- [ ] Runs a full day without the browser running out of memory (check Task Manager at close).
