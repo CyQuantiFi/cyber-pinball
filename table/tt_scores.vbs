@@ -21,9 +21,19 @@ Function TTPad2(n)
 End Function
 
 Function TTIsoNow()
-    Dim n : n = Now
-    TTIsoNow = Year(n) & "-" & TTPad2(Month(n)) & "-" & TTPad2(Day(n)) & "T" & _
-               TTPad2(Hour(n)) & ":" & TTPad2(Minute(n)) & ":" & TTPad2(Second(n))
+    TTIsoNow = TTIsoTime(Now)
+End Function
+
+' Local time as 2026-10-22T14:03:11 (no zone).
+Function TTIsoTime(n)
+    TTIsoTime = Year(n) & "-" & TTPad2(Month(n)) & "-" & TTPad2(Day(n)) & "T" & _
+                TTPad2(Hour(n)) & ":" & TTPad2(Minute(n)) & ":" & TTPad2(Second(n))
+End Function
+
+' Local time as 20261022T140311, for game ids.
+Function TTStamp(n)
+    TTStamp = Year(n) & TTPad2(Month(n)) & TTPad2(Day(n)) & "T" & _
+              TTPad2(Hour(n)) & TTPad2(Minute(n)) & TTPad2(Second(n))
 End Function
 
 Sub TTScoresClear()
@@ -139,9 +149,97 @@ Function TTDataPath(fileName)
     TTDataPath = d & fileName
 End Function
 
-' One game as a JSON object (single line).
+' ------------------------------------------------------- CyQuantiFi export
+' Each game line is also what tools/uploader.py sends to CyQuantiFi, so it
+' carries a schema version, a unique game id, the cabinet and event, and a
+' timestamp with its UTC offset. See docs/cyquantifi-export.md.
+
+Const TT_RESULT_SCHEMA = 1
+Dim TTGameSeq : TTGameSeq = -1
+
+' Next game number on this cabinet. Kept in VPX's settings store so a restart
+' never reuses a game id. Outside VPX (the tests) it just counts from 1.
+Function TTNextGameSeq()
+    Dim v
+    If TTGameSeq < 0 Then
+        TTGameSeq = 0
+        v = ""
+        On Error Resume Next
+        v = CStr(LoadValue("ThreatTide", "GameSeq"))
+        Err.Clear
+        On Error GoTo 0
+        If IsNumeric(v) Then TTGameSeq = CLng(v)
+    End If
+    TTGameSeq = TTGameSeq + 1
+    On Error Resume Next
+    SaveValue "ThreatTide", "GameSeq", CStr(TTGameSeq)
+    Err.Clear
+    On Error GoTo 0
+    TTNextGameSeq = TTGameSeq
+End Function
+
+' Minutes east of UTC right now, or Empty if it can't be found.
+' TT_UtcOffsetMin wins; otherwise Windows' ActiveTimeBias (which includes
+' daylight saving) is read from the registry.
+Function TTUtcOffsetMin()
+    Dim sh, bias
+    TTUtcOffsetMin = Empty
+    If CStr(TT_UtcOffsetMin) <> "" Then
+        If IsNumeric(TT_UtcOffsetMin) Then TTUtcOffsetMin = CLng(TT_UtcOffsetMin)
+        Exit Function
+    End If
+    bias = Empty
+    On Error Resume Next
+    Set sh = CreateObject("WScript.Shell")
+    bias = sh.RegRead("HKLM\SYSTEM\CurrentControlSet\Control\TimeZoneInformation\ActiveTimeBias")
+    Err.Clear
+    On Error GoTo 0
+    ' IsNumeric(Empty) is True in VBScript, so a failed read must be ruled out first.
+    If IsEmpty(bias) Then Exit Function
+    If IsNumeric(bias) Then
+        bias = CDbl(bias)
+        ' A REG_DWORD can come back unsigned.
+        If bias > 2147483647 Then bias = bias - 4294967296
+        TTUtcOffsetMin = -CLng(bias)
+    End If
+End Function
+
+' +11:00 / -03:30 / +00:00, or "" if the offset is unknown.
+Function TTOffsetText(m)
+    Dim sign, a
+    TTOffsetText = ""
+    If IsEmpty(m) Then Exit Function
+    sign = "+"
+    If m < 0 Then sign = "-"
+    a = Abs(m)
+    TTOffsetText = sign & TTPad2(a \ 60) & ":" & TTPad2(a Mod 60)
+End Function
+
+' 0..1 as "0.350". Built from whole numbers so a PC that writes decimals with
+' a comma still produces valid JSON.
+Function TTJsonFrac(p)
+    Dim n
+    n = Int(CDbl(p) * 1000 + 0.5)
+    If n < 0 Then n = 0
+    TTJsonFrac = CStr(n \ 1000) & "." & Right("00" & CStr(n Mod 1000), 3)
+End Function
+
+Function TTCardProb(c)
+    If c < 0 Then
+        TTCardProb = 0
+    Else
+        TTCardProb = TT_Cards(c)(3)
+    End If
+End Function
+
+' One game as a JSON object (single line), stamped now.
 Function TTGameJson(g, initials, rank)
-    Dim i, c, path, j
+    TTGameJson = TTGameJsonAt(g, initials, rank, Now, TTNextGameSeq(), TTUtcOffsetMin())
+End Function
+
+' The same, with the clock, game number and UTC offset passed in (for tests).
+Function TTGameJsonAt(g, initials, rank, n, seq, offsetMin)
+    Dim i, c, path, j, ev
     path = ""
     If g.WorstPathValue > 0 Then
         For i = 0 To TT_STAGE_COUNT - 1
@@ -149,10 +247,17 @@ Function TTGameJson(g, initials, rank)
             If i > 0 Then path = path & ","
             path = path & "{""stage"":" & TTJsonStr(TT_StageNames(i)) & _
                           ",""id"":" & TTJsonStr(TTCardId(c)) & _
-                          ",""technique"":" & TTJsonStr(TTCardName(c)) & "}"
+                          ",""technique"":" & TTJsonStr(TTCardName(c)) & _
+                          ",""probability"":" & TTJsonFrac(TTCardProb(c)) & "}"
         Next
     End If
-    j = "{""ts"":" & TTJsonStr(TTIsoNow()) & _
+    ev = ""
+    If TT_EventName <> "" Then ev = ",""event_name"":" & TTJsonStr(TT_EventName)
+    j = "{""schema_version"":" & TT_RESULT_SCHEMA & _
+        ",""game_id"":" & TTJsonStr(TT_CabinetId & "-" & TTStamp(n) & "-" & seq) & _
+        ",""cabinet_id"":" & TTJsonStr(TT_CabinetId) & _
+        ",""event_id"":" & TTJsonStr(TT_EventId) & ev & _
+        ",""ts"":" & TTJsonStr(TTIsoTime(n) & TTOffsetText(offsetMin)) & _
         ",""day"":" & TTJsonStr(TTHS_Day) & _
         ",""initials"":" & TTJsonStr(initials) & _
         ",""score"":" & TTDigits(g.Score) & _
@@ -167,7 +272,7 @@ Function TTGameJson(g, initials, rank)
         ",""storm_surge"":" & TTJsonBool(g.SurgePlayed) & _
         ",""tail_jackpot"":" & TTDigits(g.SurgeTail) & _
         ",""air_gap"":" & TTJsonBool(g.AirGapBreached) & "}"
-    TTGameJson = j
+    TTGameJsonAt = j
 End Function
 
 Function TTHighScoresJson()

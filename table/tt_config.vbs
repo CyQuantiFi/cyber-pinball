@@ -103,6 +103,14 @@ Dim TT_DataDir : TT_DataDir = ""                  ' "" = VPX user folder
 Dim TT_BackglassMode : TT_BackglassMode = "page"
 Dim TT_DofOn : TT_DofOn = True                  ' Cabinet feedback via DOF (contactors, lamps, LEDs); see docs/dof.md
 Dim TT_FormUrl : TT_FormUrl = "cyquantifi.com/play" ' Shown under the QR code
+' ---- CyQuantiFi export (tools/uploader.py; see docs/cyquantifi-export.md) ----
+' Every game line carries these, so CyQuantiFi knows which cabinet and event it
+' came from. Letters, digits, dot, dash and underscore only.
+Dim TT_CabinetId : TT_CabinetId = "TT-01"     ' Unique per cabinet
+Dim TT_EventId : TT_EventId = "booth"         ' Change for each event, e.g. "aisa-melb-2026"
+Dim TT_EventName : TT_EventName = ""          ' Shown in CyQuantiFi; "" = use TT_EventId
+' Minutes east of UTC (660 = AEDT). "" = read it from Windows at game end.
+Dim TT_UtcOffsetMin : TT_UtcOffsetMin = ""
 
 ' ---- Music (files in VPX's Music\ThreatTide\ folder, see docs/LICENSES.md) ----
 Dim TT_MusicTheme : TT_MusicTheme = "theme.mp3"   ' Loops during play

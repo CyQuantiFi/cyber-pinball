@@ -19,3 +19,9 @@ backglass/media/*.mp4
 backglass/media/*.webm
 backglass/media/playlist.js
 dist/promo.mp4
+
+# CyQuantiFi uploader: the key and its working files live in the data folder
+ThreatTide_upload.ini
+ThreatTide_upload_state.json
+ThreatTide_upload_errors.jsonl
+ThreatTide_upload.log

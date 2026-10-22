@@ -6,6 +6,12 @@ Sub RunScoresTests()
     RunTest "Test_ContestModeDailyReset"
     RunTest "Test_HighScoreLine"
     RunTest "Test_GameJson"
+    RunTest "Test_GameJsonExportFields"
+    RunTest "Test_GameJsonNoPath"
+    RunTest "Test_GameSeqCounts"
+    RunTest "Test_OffsetText"
+    RunTest "Test_UtcOffsetSetting"
+    RunTest "Test_JsonFrac"
     RunTest "Test_JsonEscaping"
     RunTest "Test_BackglassStateJs"
 End Sub
@@ -70,6 +76,70 @@ Sub Test_GameJson()
     AssertTrue InStr(j, """id"":""T1595""") > 0, "first technique"
     AssertTrue InStr(j, """technique"":""Data Encrypted for Impact""") > 0, "last technique"
     AssertTrue InStr(j, """air_gap"":false}") > 0, "air gap flag closes the object"
+End Sub
+
+Sub Test_GameJsonExportFields()
+    Dim g, j, n
+    Set g = NewGame()
+    PlayPath g, 20000
+    n = DateSerial(2026, 10, 22) + TimeSerial(14, 3, 11)
+    TT_CabinetId = "TT-07"
+    TT_EventId = "aisa-melb-2026"
+    TT_EventName = "AISA Melbourne"
+    j = TTGameJsonAt(g, "ABC", 1, n, 42, 660)
+    AssertTrue Left(j, 20) = "{""schema_version"":1,", "schema version leads"
+    AssertTrue InStr(j, """game_id"":""TT-07-20261022T140311-42""") > 0, "game id"
+    AssertTrue InStr(j, """cabinet_id"":""TT-07""") > 0, "cabinet"
+    AssertTrue InStr(j, """event_id"":""aisa-melb-2026"",""event_name"":""AISA Melbourne""") > 0, "event"
+    AssertTrue InStr(j, """ts"":""2026-10-22T14:03:11+11:00""") > 0, "time with offset"
+    AssertTrue InStr(j, """id"":""T1595"",""technique"":""Active Scanning"",""probability"":0.900}") > 0, "probability"
+    AssertTrue InStr(j, """probability"":0.300}") > 0, "last stage probability"
+    AssertTrue InStr(j, """air_gap"":false}") > 0, "still closes the object"
+
+    TT_EventName = ""
+    j = TTGameJsonAt(g, "ABC", 1, n, 1, Empty)
+    AssertEq InStr(j, "event_name"), 0, "no event name when unset"
+    AssertTrue InStr(j, """ts"":""2026-10-22T14:03:11""") > 0, "unknown offset leaves the time bare"
+    TT_CabinetId = "TT-01"
+    TT_EventId = "booth"
+End Sub
+
+Sub Test_GameJsonNoPath()
+    Dim g, j : Set g = NewGame()
+    j = TTGameJsonAt(g, "ZZZ", 0, Now, 1, 0)
+    AssertTrue InStr(j, """worst_path"":0,") > 0, "no path value"
+    AssertTrue InStr(j, """worst_path_techniques"":[]") > 0, "no techniques"
+End Sub
+
+Sub Test_GameSeqCounts()
+    Dim a, b
+    a = TTNextGameSeq()
+    b = TTNextGameSeq()
+    AssertEq b, a + 1, "each game gets the next number"
+End Sub
+
+Sub Test_OffsetText()
+    AssertEq TTOffsetText(660), "+11:00", "east"
+    AssertEq TTOffsetText(-210), "-03:30", "west, half hour"
+    AssertEq TTOffsetText(0), "+00:00", "UTC"
+    AssertEq TTOffsetText(Empty), "", "unknown"
+End Sub
+
+Sub Test_UtcOffsetSetting()
+    TT_UtcOffsetMin = 600
+    AssertEq TTUtcOffsetMin(), 600, "setting wins"
+    TT_UtcOffsetMin = "abc"
+    AssertTrue IsEmpty(TTUtcOffsetMin()), "a bad setting is unknown, not a guess"
+    TT_UtcOffsetMin = ""
+    AssertTrue Not IsEmpty(TTUtcOffsetMin()), "read from Windows"
+End Sub
+
+Sub Test_JsonFrac()
+    AssertEq TTJsonFrac(0.35), "0.350", "two places"
+    AssertEq TTJsonFrac(1), "1.000", "one"
+    AssertEq TTJsonFrac(0), "0.000", "zero"
+    AssertEq TTJsonFrac(0.0004), "0.000", "rounds down"
+    AssertEq TTJsonFrac(0.0006), "0.001", "rounds up"
 End Sub
 
 Sub Test_JsonEscaping()
